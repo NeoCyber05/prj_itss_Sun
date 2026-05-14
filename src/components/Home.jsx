@@ -235,7 +235,14 @@ function SlideCard({ title, image, date, slides, views, t }) {
   );
 }
 
-export default function Home({ isLoggedIn, submittedSearchQuery, isSearchActive }) {
+export default function Home({
+  isLoggedIn,
+  submittedSearchQuery,
+  isSearchActive,
+  onCreateNewSlide,
+  isCreatingSlide,
+  createSlideError,
+}) {
   const { language, t } = useLanguage();
   const [activeSort, setActiveSort] = useState('name');
   const hasSearchQuery = submittedSearchQuery.length > 0;
@@ -299,12 +306,20 @@ export default function Home({ isLoggedIn, submittedSearchQuery, isSearchActive 
               <button
                 type="button"
                 className="home-create-btn"
-                onClick={() => alert(t('home.createNewSlideAlert'))}
+                onClick={onCreateNewSlide}
+                disabled={isCreatingSlide}
               >
-                <span className="home-create-btn__label">{t('home.createNewSlide')}</span>
+                <span className="home-create-btn__label">
+                  {isCreatingSlide ? t('home.createNewSlideLoading') : t('home.createNewSlide')}
+                </span>
                 <span className="home-create-btn__hint">{t('home.createNewSlideHint')}</span>
               </button>
             </div>
+            {createSlideError && (
+              <div className="home-create-error" role="alert">
+                {createSlideError}
+              </div>
+            )}
             <div className="home-grid">
               {recommendedTemplates.map((template) => (
                 <SlideCard
