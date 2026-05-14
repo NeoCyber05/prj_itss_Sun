@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useLanguage } from '../i18n/LanguageContext.jsx';
 import { UserIcon, MailIcon, LockIcon, GoogleIcon, FacebookIcon } from './Icons';
 import { supabase } from '../supabaseClient';
 import './AuthCard.css';
@@ -9,6 +10,7 @@ import './AuthCard.css';
  * @param {function} props.onSwitchToLogin – callback to show login form
  */
 export default function RegisterForm({ onSwitchToLogin }) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +23,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
   async function handleSocialLogin(provider) {
     setError('');
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
         redirectTo: window.location.origin,
@@ -29,7 +31,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
     });
 
     if (error) {
-      setError(`Lỗi đăng ký ${provider}: ` + error.message);
+      setError(t('auth.socialRegisterError', { provider, message: error.message }));
       setLoading(false);
     }
   }
@@ -55,32 +57,32 @@ export default function RegisterForm({ onSwitchToLogin }) {
 
     if (!name.trim()) {
       errs.name = true;
-      if (!firstError) firstError = 'お名前を入力してください。';
+      if (!firstError) firstError = t('auth.errors.nameRequired');
     }
 
     if (!email.trim()) {
       errs.email = true;
-      if (!firstError) firstError = 'メールアドレスを入力してください。';
+      if (!firstError) firstError = t('auth.errors.emailRequired');
     } else if (!isValidEmail(email.trim())) {
       errs.email = true;
-      if (!firstError) firstError = 'メールアドレスの形式が正しくありません。';
+      if (!firstError) firstError = t('auth.errors.emailInvalid');
     }
 
     if (!password) {
       errs.password = true;
-      if (!firstError) firstError = 'パスワードを入力してください。';
+      if (!firstError) firstError = t('auth.errors.passwordRequired');
     }
 
     if (!confirmPassword) {
       errs.confirmPassword = true;
-      if (!firstError) firstError = 'パスワードを再入力してください。';
+      if (!firstError) firstError = t('auth.errors.confirmPasswordRequired');
     } else if (password !== confirmPassword) {
       errs.confirmPassword = true;
-      if (!firstError) firstError = 'パスワードが一致しません。';
+      if (!firstError) firstError = t('auth.errors.passwordMismatch');
     }
 
     if (!termsAccepted) {
-      if (!firstError) firstError = '利用規約に同意してください。';
+      if (!firstError) firstError = t('auth.errors.termsRequired');
     }
 
     setFieldErrors(errs);
@@ -93,14 +95,14 @@ export default function RegisterForm({ onSwitchToLogin }) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      alert('登録成功！（デモ）');
+      alert(t('auth.registerSuccess'));
       onSwitchToLogin();
     }, 1200);
   }
 
   return (
     <section className="auth-card" id="registerCard">
-      <h1 className="auth-card__title" id="registerTitle">新規登録</h1>
+      <h1 className="auth-card__title" id="registerTitle">{t('auth.registerTitle')}</h1>
 
       <form className="auth-card__form" id="registerForm" noValidate onSubmit={handleSubmit}>
         {/* Name */}
@@ -110,7 +112,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
             type="text"
             className="input-group__input"
             id="registerName"
-            placeholder="お名前"
+            placeholder={t('auth.namePlaceholder')}
             value={name}
             onChange={(e) => { setName(e.target.value); clearFieldError('name'); }}
           />
@@ -123,7 +125,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
             type="email"
             className="input-group__input"
             id="registerEmail"
-            placeholder="メールアドレス"
+            placeholder={t('auth.emailPlaceholder')}
             value={email}
             onChange={(e) => { setEmail(e.target.value); clearFieldError('email'); }}
           />
@@ -136,7 +138,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
             type="password"
             className="input-group__input"
             id="registerPassword"
-            placeholder="パスワード"
+            placeholder={t('auth.passwordPlaceholder')}
             value={password}
             onChange={(e) => { setPassword(e.target.value); clearFieldError('password'); }}
           />
@@ -149,7 +151,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
             type="password"
             className="input-group__input"
             id="registerConfirmPassword"
-            placeholder="パスワードを再入力"
+            placeholder={t('auth.confirmPasswordPlaceholder')}
             value={confirmPassword}
             onChange={(e) => { setConfirmPassword(e.target.value); clearFieldError('confirmPassword'); }}
           />
@@ -165,7 +167,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
           id="registerSubmitBtn"
           disabled={loading}
         >
-          {loading ? '登録中...' : '登録する'}
+          {loading ? t('auth.registerSubmitting') : t('auth.registerSubmit')}
         </button>
       </form>
 
@@ -178,7 +180,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
           checked={termsAccepted}
           onChange={(e) => setTermsAccepted(e.target.checked)}
         />
-        <span>利用規約とプライバシーポリシーに同意する</span>
+        <span>{t('auth.termsLabel')}</span>
       </label>
 
       {/* Social register */}
@@ -191,7 +193,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
           disabled={loading}
         >
           <GoogleIcon />
-          <span>Googleで登録</span>
+          <span>{t('auth.googleRegister')}</span>
         </button>
         <button
           className="btn btn--social"
@@ -201,20 +203,20 @@ export default function RegisterForm({ onSwitchToLogin }) {
           disabled={loading}
         >
           <FacebookIcon />
-          <span>Facebookで登録</span>
+          <span>{t('auth.facebookRegister')}</span>
         </button>
       </div>
 
       {/* Switch to login */}
       <p className="auth-card__switch" id="registerSwitchText">
-        既にアカウントをお持ちですか？
+        {t('auth.registerSwitchPrompt')}
         <button
           className="auth-card__switch-link"
           id="showLoginLink"
           type="button"
           onClick={onSwitchToLogin}
         >
-          ログインしてください。
+          {t('auth.registerSwitchAction')}
         </button>
       </p>
     </section>

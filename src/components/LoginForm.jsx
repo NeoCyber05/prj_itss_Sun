@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useLanguage } from '../i18n/LanguageContext.jsx';
 import { MailIcon, LockIcon, GoogleIcon, FacebookIcon } from './Icons';
 import { supabase } from '../supabaseClient';
 import './AuthCard.css';
@@ -6,9 +7,11 @@ import './AuthCard.css';
 /**
  * LoginForm – ログイン form component.
  * @param {Object} props
+ * @param {function} props.onLoginSuccess – callback after successful login
  * @param {function} props.onSwitchToRegister – callback to show register form
  */
-export default function LoginForm({ onSwitchToRegister }) {
+export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +21,7 @@ export default function LoginForm({ onSwitchToRegister }) {
   async function handleSocialLogin(provider) {
     setError('');
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
         redirectTo: window.location.origin,
@@ -26,7 +29,7 @@ export default function LoginForm({ onSwitchToRegister }) {
     });
 
     if (error) {
-      setError(`Lỗi đăng nhập ${provider}: ` + error.message);
+      setError(t('auth.socialLoginError', { provider, message: error.message }));
       setLoading(false);
     }
   }
@@ -51,15 +54,15 @@ export default function LoginForm({ onSwitchToRegister }) {
 
     if (!email.trim()) {
       errs.email = true;
-      setError('メールアドレスを入力してください。');
+      setError(t('auth.errors.emailRequired'));
     } else if (!isValidEmail(email.trim())) {
       errs.email = true;
-      setError('メールアドレスの形式が正しくありません。');
+      setError(t('auth.errors.emailInvalid'));
     }
 
     if (!password) {
       errs.password = true;
-      if (!errs.email) setError('パスワードを入力してください。');
+      if (!errs.email) setError(t('auth.errors.passwordRequired'));
     }
 
     setFieldErrors(errs);
@@ -69,13 +72,13 @@ export default function LoginForm({ onSwitchToRegister }) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      alert('ログイン成功！（デモ）');
+      onLoginSuccess({ email: email.trim() });
     }, 1200);
   }
 
   return (
     <section className="auth-card" id="loginCard">
-      <h1 className="auth-card__title" id="loginTitle">ログイン</h1>
+      <h1 className="auth-card__title" id="loginTitle">{t('auth.loginTitle')}</h1>
 
       <form className="auth-card__form" id="loginForm" noValidate onSubmit={handleSubmit}>
         {/* Email */}
@@ -85,7 +88,7 @@ export default function LoginForm({ onSwitchToRegister }) {
             type="email"
             className="input-group__input"
             id="loginEmail"
-            placeholder="メールアドレス"
+            placeholder={t('auth.emailPlaceholder')}
             value={email}
             onChange={(e) => { setEmail(e.target.value); clearFieldError('email'); }}
           />
@@ -98,7 +101,7 @@ export default function LoginForm({ onSwitchToRegister }) {
             type="password"
             className="input-group__input"
             id="loginPassword"
-            placeholder="パスワード"
+            placeholder={t('auth.passwordPlaceholder')}
             value={password}
             onChange={(e) => { setPassword(e.target.value); clearFieldError('password'); }}
           />
@@ -114,7 +117,7 @@ export default function LoginForm({ onSwitchToRegister }) {
           id="loginSubmitBtn"
           disabled={loading}
         >
-          {loading ? 'ログイン中...' : 'ログイン'}
+          {loading ? t('auth.loginSubmitting') : t('auth.loginSubmit')}
         </button>
       </form>
 
@@ -123,9 +126,9 @@ export default function LoginForm({ onSwitchToRegister }) {
         className="auth-card__link--forgot"
         id="forgotPasswordLink"
         type="button"
-        onClick={() => alert('パスワードリセット機能は未実装です。')}
+        onClick={() => alert(t('auth.forgotPasswordAlert'))}
       >
-        パスワードをお忘れですか？
+        {t('auth.forgotPassword')}
       </button>
 
       {/* Social login */}
@@ -138,7 +141,7 @@ export default function LoginForm({ onSwitchToRegister }) {
           disabled={loading}
         >
           <GoogleIcon />
-          <span>Googleでログイン</span>
+          <span>{t('auth.googleLogin')}</span>
         </button>
         <button
           className="btn btn--social"
@@ -148,20 +151,20 @@ export default function LoginForm({ onSwitchToRegister }) {
           disabled={loading}
         >
           <FacebookIcon />
-          <span>Facebookでログイン</span>
+          <span>{t('auth.facebookLogin')}</span>
         </button>
       </div>
 
       {/* Switch to register */}
       <p className="auth-card__switch" id="loginSwitchText">
-        新規ユーザーですか？
+        {t('auth.loginSwitchPrompt')}
         <button
           className="auth-card__switch-link"
           id="showRegisterLink"
           type="button"
           onClick={onSwitchToRegister}
         >
-          今すぐ登録してください。
+          {t('auth.loginSwitchAction')}
         </button>
       </p>
     </section>

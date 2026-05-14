@@ -1,5 +1,3 @@
-import React from 'react';
-
 /* Reusable SVG icons for auth forms */
 
 export function MailIcon() {

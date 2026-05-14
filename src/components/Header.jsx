@@ -1,49 +1,107 @@
-import React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import logo from '../assets/logo.png';
+import { useLanguage } from '../i18n/LanguageContext.jsx';
 import './Header.css';
 
 /**
  * Header – top navigation bar.
  * Contains: logo, search bar, language selector.
  */
-export default function Header({ onViewChange, currentView }) {
+export default function Header({
+  onViewChange,
+  currentView,
+  isAuthReady,
+  isLoggedIn,
+  user,
+  onLogout,
+  searchQuery,
+  onSearchQueryChange,
+  onSearchSubmit,
+  searchPlaceholder,
+}) {
+  const { language, setLanguage, t } = useLanguage();
+  const isAuthView = currentView === 'login' || currentView === 'register';
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const avatarMenuRef = useRef(null);
+  const userMetadata = user?.user_metadata ?? {};
+  const userName = userMetadata.full_name || userMetadata.name || user?.email || t('header.defaultUserName');
+  const userEmail = user?.email || '';
+  const avatarUrl = userMetadata.avatar_url || userMetadata.picture;
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (!avatarMenuRef.current?.contains(event.target)) {
+        setIsAvatarMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setIsAvatarMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  function handleUserInfoClick() {
+    const lines = [t('header.userInfoTitle'), `${t('header.nameLabel')}: ${userName}`];
+
+    if (userEmail) {
+      lines.push(`${t('header.emailLabel')}: ${userEmail}`);
+    }
+
+    alert(lines.join('\n'));
+    setIsAvatarMenuOpen(false);
+  }
+
+  function handleLogoutClick() {
+    setIsAvatarMenuOpen(false);
+    onLogout();
+  }
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    onSearchSubmit();
+  }
+
   return (
     <header className="header" id="mainHeader">
-      {/* ── Logo ── */}
       <div className="header__left">
-        <a href="#" onClick={(e) => { e.preventDefault(); onViewChange('home'); }} className="header__logo" id="logoLink">
-          <img
-            src={logo}
-            alt="RakuSlide"
-            className="header__logo-img"
-          />
+        <a
+          href="#"
+          onClick={(event) => {
+            event.preventDefault();
+            onViewChange('home');
+          }}
+          className="header__logo"
+          id="logoLink"
+        >
+          <img src={logo} alt="RakuSlide" className="header__logo-img" />
         </a>
       </div>
 
-      {/* ── Search ── */}
       <div className="header__center">
-        <div className="header__search" id="searchBar">
+        <form className="header__search" id="searchBar" onSubmit={handleSearchSubmit}>
           <input
             type="text"
             className="header__search-input"
             id="searchInput"
-            placeholder="すうがく"
+            placeholder={searchPlaceholder}
+            value={searchQuery}
+            onChange={(event) => onSearchQueryChange(event.target.value)}
           />
           <button
-            className="header__search-mic"
-            id="micBtn"
-            aria-label="音声入力"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="22"></line>
-            </svg>
-          </button>
-          <button
+            type="submit"
             className="header__search-btn"
             id="searchBtn"
-            aria-label="検索"
+            aria-label={t('header.searchAria')}
           >
             <svg
               width="18"
@@ -59,34 +117,90 @@ export default function Header({ onViewChange, currentView }) {
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </button>
-        </div>
+        </form>
       </div>
 
-      {/* ── Right Actions ── */}
       <div className="header__right">
-        {currentView !== 'login' && currentView !== 'register' && (
+        {isAuthReady && !isLoggedIn && !isAuthView && (
           <div className="header__auth-buttons">
             <button className="btn-login-outline" onClick={() => onViewChange('login')}>
-              ログイン
+              {t('header.login')}
             </button>
             <button className="btn-register-solid" onClick={() => onViewChange('register')}>
-              新規登録
+              {t('header.register')}
             </button>
           </div>
         )}
-        
+
         <div className="header__user-lang">
-          {currentView !== 'login' && currentView !== 'register' && (
-            <div className="header__avatar">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
+          {isAuthReady && isLoggedIn && !isAuthView && (
+          <>
+            <button
+              type="button"
+              className="btn-my-slides"
+              onClick={() => alert(t('home.mySlidesAlert'))}
+            >
+              {t('header.mySlides')}
+            </button>
+            <div className="header__user-menu" ref={avatarMenuRef}>
+              <button
+                type="button"
+                className="header__avatar"
+                aria-label={t('header.userMenuAria')}
+                aria-expanded={isAvatarMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setIsAvatarMenuOpen((open) => !open)}
+              >
+                {avatarUrl ? (
+                  <img className="header__avatar-img" src={avatarUrl} alt="" />
+                ) : (
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                )}
+              </button>
+
+              {isAvatarMenuOpen && (
+                <div className="header__avatar-menu" role="menu">
+                  <button
+                    type="button"
+                    className="header__avatar-menu-item"
+                    role="menuitem"
+                    onClick={handleUserInfoClick}
+                  >
+                    {t('header.userInfo')}
+                  </button>
+                  <button
+                    type="button"
+                    className="header__avatar-menu-item header__avatar-menu-item--danger"
+                    role="menuitem"
+                    onClick={handleLogoutClick}
+                  >
+                    {t('header.logout')}
+                  </button>
+                </div>
+              )}
             </div>
+          </>
           )}
-          <select className="header__lang-select" id="langSelect" defaultValue="jp">
-            <option value="jp">JP</option>
-            <option value="en">EN</option>
+          <select
+            className="header__lang-select"
+            id="langSelect"
+            value={language}
+            onChange={(event) => setLanguage(event.target.value)}
+            aria-label={t('header.languageSelectAria')}
+          >
+            <option value="ja">JP</option>
             <option value="vi">VI</option>
           </select>
         </div>
