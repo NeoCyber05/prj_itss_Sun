@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
-import { getDeckForEditor, saveDeckForEditor } from '../services/slideCreationService.js';
+import {
+  getDeckForEditor,
+  saveDeckForEditor,
+  updateTemplateShareAccess,
+} from '../services/slideCreationService.js';
 import './SlideEditor.css';
 
 const EDITOR_COPY = {
@@ -63,6 +67,22 @@ const EDITOR_COPY = {
     previewTitle: 'プレビュー',
     closePreview: '閉じる',
     quizPrompt: 'このスライドからクイズを3問作成',
+    shareDialogTitle: 'プレゼンテーションを共有',
+    shareViewingCount: '0名が閲覧中',
+    shareSettings: '設定',
+    shareAddUserPlaceholder: '+ ユーザーを追加...',
+    shareAddUser: '追加',
+    shareOwnerName: 'あなた',
+    shareOwnerRole: '所有者',
+    shareAccessTitle: 'アクセス権限',
+    sharePrivateAccess: 'あなたのみアクセス可能',
+    shareLinkAccess: 'リンクを知っている全員',
+    shareCopyLink: 'リンクをコピー',
+    shareAccessUpdated: '共有権限を更新しました',
+    shareAccessError: '共有権限を更新できませんでした: {{message}}',
+    shareInviteAdded: 'ユーザーを追加しました',
+    shareInviteEmpty: 'メールアドレスを入力してください',
+    closeShare: '閉じる',
   },
   vi: {
     backShort: 'Trang chủ',
@@ -123,6 +143,22 @@ const EDITOR_COPY = {
     previewTitle: 'Xem trước',
     closePreview: 'Đóng',
     quizPrompt: 'Tạo 3 câu hỏi quiz từ slide này',
+    shareDialogTitle: 'Chia sẻ bài thuyết trình',
+    shareViewingCount: '0 người đang xem',
+    shareSettings: 'Cài đặt',
+    shareAddUserPlaceholder: '+ Thêm người dùng...',
+    shareAddUser: 'Thêm',
+    shareOwnerName: 'Bạn',
+    shareOwnerRole: 'Chủ sở hữu',
+    shareAccessTitle: 'Quyền truy cập',
+    sharePrivateAccess: 'Chỉ bạn có quyền truy cập',
+    shareLinkAccess: 'Ai có link đều xem được',
+    shareCopyLink: 'Sao chép link',
+    shareAccessUpdated: 'Đã cập nhật quyền chia sẻ',
+    shareAccessError: 'Không thể cập nhật quyền chia sẻ: {{message}}',
+    shareInviteAdded: 'Đã thêm người dùng',
+    shareInviteEmpty: 'Nhập email người dùng cần thêm',
+    closeShare: 'Đóng',
   },
 };
 
@@ -160,6 +196,30 @@ const IMAGE_TILES = [
 ];
 
 const WIKIMEDIA_SEARCH_ENDPOINT = 'https://commons.wikimedia.org/w/api.php';
+const GOOGLE_CUSTOM_SEARCH_ENDPOINT = 'https://www.googleapis.com/customsearch/v1';
+
+const IMAGE_SEARCH_QUERY_BY_KEYWORD = {
+  dog: ['domestic dog photograph', 'dog portrait'],
+  cat: ['domestic cat photograph', 'cat portrait'],
+  flower: ['flower photograph', 'garden flower'],
+  beach: ['beach photograph', 'seaside landscape'],
+  mountain: ['mountain landscape photograph', 'mountain peak'],
+  car: ['car photograph', 'automobile'],
+  school: ['school classroom photograph', 'school building'],
+  technology: ['technology device photograph', 'computer technology'],
+  business: ['business meeting photograph', 'office business'],
+};
+
+const IMAGE_COLOR_KEYWORDS = [
+  { key: 'black', patterns: ['den', 'mau den', 'black'] },
+  { key: 'white', patterns: ['trang', 'mau trang', 'white'] },
+  { key: 'brown', patterns: ['nau', 'mau nau', 'brown'] },
+  { key: 'yellow', patterns: ['vang', 'mau vang', 'yellow'] },
+  { key: 'gray', patterns: ['xam', 'mau xam', 'grey', 'gray'] },
+  { key: 'red', patterns: ['do', 'mau do', 'red'] },
+  { key: 'blue', patterns: ['xanh duong', 'mau xanh duong', 'blue'] },
+  { key: 'green', patterns: ['xanh la', 'mau xanh la', 'green'] },
+];
 
 function getEditorCopy(language) {
   return EDITOR_COPY[language] ?? EDITOR_COPY.ja;
@@ -192,8 +252,8 @@ function stripVietnameseMarks(value) {
 function normalizeImageSearchKeyword(query) {
   const normalized = stripVietnameseMarks(query).toLowerCase();
 
-  if (/\bcho\b/.test(normalized) || normalized.includes('con cho')) return 'dog';
-  if (/\bmeo\b/.test(normalized) || normalized.includes('con meo')) return 'cat';
+  if (/\bcho\b/.test(normalized) || normalized.includes('con cho') || normalized.includes('cun')) return 'dog';
+  if (/\bmeo\b/.test(normalized) || normalized.includes('con meo') || normalized.includes('meo con')) return 'cat';
   if (normalized.includes('hoa')) return 'flower';
   if (normalized.includes('bien')) return 'beach';
   if (normalized.includes('nui')) return 'mountain';
@@ -203,6 +263,41 @@ function normalizeImageSearchKeyword(query) {
   if (normalized.includes('kinh doanh')) return 'business';
 
   return query.trim();
+}
+
+function getImageColorKeyword(query) {
+  const normalized = stripVietnameseMarks(query).toLowerCase();
+  const color = IMAGE_COLOR_KEYWORDS.find((item) => (
+    item.patterns.some((pattern) => normalized.includes(pattern))
+  ));
+
+  return color?.key ?? '';
+}
+
+function getImageSearchProfile(query) {
+  const originalQuery = query.trim();
+  const normalizedQuery = normalizeImageSearchKeyword(originalQuery);
+  const englishQueries = IMAGE_SEARCH_QUERY_BY_KEYWORD[normalizedQuery];
+  const colorKeyword = getImageColorKeyword(originalQuery);
+
+  if (englishQueries) {
+    return {
+      directTags: [colorKeyword, normalizedQuery].filter(Boolean),
+      terms: englishQueries.map((term) => [colorKeyword, term].filter(Boolean).join(' ')),
+    };
+  }
+
+  if (normalizedQuery && normalizedQuery !== originalQuery) {
+    return {
+      directTags: [colorKeyword, normalizedQuery].filter(Boolean),
+      terms: [[colorKeyword, normalizedQuery].filter(Boolean).join(' ')],
+    };
+  }
+
+  return {
+    directTags: [],
+    terms: [originalQuery].filter(Boolean),
+  };
 }
 
 function buildPlaceholderImageResults(query, copy) {
@@ -239,6 +334,20 @@ function buildFallbackImageResults(query, copy) {
   }));
 }
 
+function buildDirectImageResults(tags, query, copy) {
+  const searchTerm = tags.length ? tags.join(',') : normalizeImageSearchKeyword(query) || 'presentation';
+  const key = slugForKey(searchTerm);
+
+  return IMAGE_TILES.map((tile, index) => ({
+    ...tile,
+    resultId: `direct-${key}-${index}`,
+    label: query.trim() ? `${query.trim()} ${index + 1}` : `${copy.imageTile} ${index + 1}`,
+    thumbIndex: index + 1,
+    src: `https://loremflickr.com/640/360/${encodeURIComponent(searchTerm)}?lock=${index + 101}`,
+    sourceUrl: null,
+  }));
+}
+
 function getWikimediaImageResults(pages, query, copy) {
   return Object.values(pages ?? {})
     .map((page, index) => {
@@ -267,10 +376,85 @@ function getWikimediaImageResults(pages, query, copy) {
     .slice(0, IMAGE_TILES.length);
 }
 
+function getGoogleCustomSearchConfig() {
+  const apiKey = import.meta.env.VITE_GOOGLE_CSE_API_KEY?.trim();
+  const searchEngineId = import.meta.env.VITE_GOOGLE_CSE_ID?.trim();
+
+  return {
+    apiKey,
+    isConfigured: Boolean(apiKey && searchEngineId),
+    searchEngineId,
+  };
+}
+
+function getGoogleImageResults(items, query, copy) {
+  return (items ?? [])
+    .map((item, index) => {
+      const src = item.image?.thumbnailLink ?? item.link;
+
+      if (!src) return null;
+
+      const tile = IMAGE_TILES[index % IMAGE_TILES.length];
+
+      return {
+        ...tile,
+        resultId: `google-${item.cacheId ?? slugForKey(item.link ?? item.title)}-${index}`,
+        label: item.title || (query.trim() ? `${query.trim()} ${index + 1}` : `${copy.imageTile} ${index + 1}`),
+        sourceUrl: item.image?.contextLink ?? item.link ?? null,
+        src,
+        thumbIndex: (index % IMAGE_TILES.length) + 1,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, IMAGE_TILES.length);
+}
+
+async function fetchGoogleImageResults(searchTerms, originalQuery, copy) {
+  const { apiKey, isConfigured, searchEngineId } = getGoogleCustomSearchConfig();
+
+  if (!isConfigured) {
+    return [];
+  }
+
+  for (const searchTerm of searchTerms) {
+    const params = new URLSearchParams({
+      cx: searchEngineId,
+      imgType: 'photo',
+      key: apiKey,
+      num: String(IMAGE_TILES.length),
+      q: searchTerm,
+      safe: 'active',
+      searchType: 'image',
+    });
+
+    const response = await fetch(`${GOOGLE_CUSTOM_SEARCH_ENDPOINT}?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const payload = await response.json();
+    const results = getGoogleImageResults(payload.items, originalQuery, copy);
+
+    if (results.length) return results;
+  }
+
+  return [];
+}
+
 async function fetchImageResults(query, copy) {
   const originalQuery = query.trim();
-  const normalizedQuery = normalizeImageSearchKeyword(originalQuery);
-  const searchTerms = [...new Set([originalQuery, normalizedQuery].filter(Boolean))];
+  const searchProfile = getImageSearchProfile(originalQuery);
+  const searchTerms = [...new Set([originalQuery, ...searchProfile.terms].filter(Boolean))];
+  const googleResults = await fetchGoogleImageResults(searchTerms, originalQuery, copy);
+
+  if (googleResults.length) return googleResults;
+
+  if (searchProfile.directTags.length) {
+    return buildDirectImageResults(searchProfile.directTags, originalQuery, copy);
+  }
 
   for (const searchTerm of searchTerms) {
     const params = new URLSearchParams({
@@ -560,6 +744,10 @@ function applyTitleToSlide(slide, title) {
   };
 }
 
+function getShareAccessFromTemplate(template) {
+  return template?.is_public || template?.visibility === 'public' ? 'link' : 'private';
+}
+
 function Icon({ name, size = 22 }) {
   const common = {
     width: size,
@@ -634,6 +822,35 @@ function Icon({ name, size = 22 }) {
           <circle cx="6" cy="12" r="3" />
           <circle cx="18" cy="19" r="3" />
           <path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2" />
+        </svg>
+      );
+    case 'link':
+      return (
+        <svg {...common}>
+          <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+          <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+        </svg>
+      );
+    case 'lock':
+      return (
+        <svg {...common}>
+          <rect x="5" y="10" width="14" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </svg>
+      );
+    case 'settings':
+      return (
+        <svg {...common}>
+          <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.4 1.08V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 3.63 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.08-.4H2a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 3.63 8a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 8 3.63a1.7 1.7 0 0 0 1-.63A1.7 1.7 0 0 0 9.4 1.92V2a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 3.63a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 8c.18.4.4.73.63 1 .3.25.68.4 1.08.4H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z" />
+        </svg>
+      );
+    case 'more':
+      return (
+        <svg {...common}>
+          <circle cx="5" cy="12" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="19" cy="12" r="1.5" />
         </svg>
       );
     case 'quiz':
@@ -747,6 +964,7 @@ function SlideElement({
   onTextChange,
   readOnly = false,
 }) {
+  const textRef = useRef(null);
   const elementStyle = {
     left: `${element.x}%`,
     top: `${element.y}%`,
@@ -778,6 +996,19 @@ function SlideElement({
     }
   }
 
+  useLayoutEffect(() => {
+    const textNode = textRef.current;
+
+    if (!textNode || element.type !== 'text') return;
+    if (document.activeElement === textNode) return;
+
+    const nextText = element.text ?? '';
+
+    if (textNode.textContent !== nextText) {
+      textNode.textContent = nextText;
+    }
+  }, [element.id, element.text, element.type]);
+
   return (
     <div
       className={`slide-editor__element slide-editor__element--${element.type}${isSelected ? ' slide-editor__element--selected' : ''}`}
@@ -798,6 +1029,7 @@ function SlideElement({
     >
       {element.type === 'text' && (
         <div
+          ref={textRef}
           className="slide-editor__element-text"
           contentEditable={!readOnly && isSelected}
           data-editable-text={!readOnly && isSelected ? 'true' : undefined}
@@ -809,9 +1041,7 @@ function SlideElement({
               event.stopPropagation();
             }
           }}
-        >
-          {element.text}
-        </div>
+        />
       )}
 
       {(element.type === 'shape' || element.type === 'frame') && (
@@ -1007,7 +1237,6 @@ export default function SlideEditor({
   const { language, t } = useLanguage();
   const copy = useMemo(() => getEditorCopy(language), [language]);
   const canvasRef = useRef(null);
-  const sidebarSectionRefs = useRef({});
   const initialEditorSlides = useMemo(
     () => (initialDeck ? buildEditableSlides(initialDeck.slides, initialDeck.template, copy) : []),
     [copy, initialDeck],
@@ -1035,6 +1264,11 @@ export default function SlideEditor({
   const [saveError, setSaveError] = useState('');
   const [isSavingDeck, setIsSavingDeck] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareAccess, setShareAccess] = useState(() => getShareAccessFromTemplate(initialDeck?.template));
+  const [isUpdatingShareAccess, setIsUpdatingShareAccess] = useState(false);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
+  const [shareInvitees, setShareInvitees] = useState([]);
   const [dragState, setDragState] = useState(null);
   const canLoadDeck = Boolean(!initialDeck && templateId && currentUserId);
   const missingLoadInput = Boolean(!initialDeck && (!templateId || !currentUserId));
@@ -1107,6 +1341,7 @@ export default function SlideEditor({
           setActiveSlideId(firstSlide?.id ?? '');
           setSelectedElementId(firstSlide?.elements[0]?.id ?? '');
           setDeckTitleDraft(loadedDeck.template?.title ?? getSlideDisplayTitle(firstSlide, copy.defaultTitle));
+          setShareAccess(getShareAccessFromTemplate(loadedDeck.template));
           setError('');
         }
       })
@@ -1214,29 +1449,97 @@ export default function SlideEditor({
     updateElement(selectedElement.id, { style: stylePatch });
   }
 
-  function handleShareClick() {
-    const shareUrl = window.location.href;
+  function getShareUrl() {
+    const deckTemplateId = deck?.template?.id ?? templateId;
 
+    if (!deckTemplateId) {
+      return window.location.href;
+    }
+
+    return `${window.location.origin}${window.location.pathname}${window.location.search}#editor=${encodeURIComponent(deckTemplateId)}`;
+  }
+
+  function copyShareLink() {
     if (!navigator.clipboard?.writeText) {
       setToast(copy.copyFailed);
       return;
     }
 
-    navigator.clipboard.writeText(shareUrl)
+    navigator.clipboard.writeText(getShareUrl())
       .then(() => setToast(copy.copied))
       .catch(() => setToast(copy.copyFailed));
+  }
+
+  function handleShareClick() {
+    setIsShareDialogOpen(true);
+  }
+
+  async function handleShareAccessChange(event) {
+    const nextAccess = event.target.value;
+    const previousAccess = shareAccess;
+    const deckTemplateId = deck?.template?.id ?? templateId;
+
+    setShareAccess(nextAccess);
+
+    if (!deckTemplateId || !currentUserId) {
+      setToast(formatCopy(copy.shareAccessError, { message: t('editor.missingTemplate') }));
+      return;
+    }
+
+    setIsUpdatingShareAccess(true);
+
+    try {
+      const updatedTemplate = await updateTemplateShareAccess({
+        accessMode: nextAccess,
+        templateId: deckTemplateId,
+        userId: currentUserId,
+      });
+
+      setDeck((currentDeck) => (
+        currentDeck
+          ? {
+              ...currentDeck,
+              template: {
+                ...currentDeck.template,
+                ...updatedTemplate,
+              },
+            }
+          : currentDeck
+      ));
+      setToast(copy.shareAccessUpdated);
+    } catch (shareFailure) {
+      setShareAccess(previousAccess);
+      setToast(formatCopy(copy.shareAccessError, { message: shareFailure.message }));
+    } finally {
+      setIsUpdatingShareAccess(false);
+    }
+  }
+
+  function handleAddShareInvite(event) {
+    event.preventDefault();
+
+    const email = shareInviteEmail.trim();
+
+    if (!email) {
+      setToast(copy.shareInviteEmpty);
+      return;
+    }
+
+    setShareInvitees((currentInvitees) => (
+      currentInvitees.includes(email) ? currentInvitees : [...currentInvitees, email]
+    ));
+    setShareInviteEmail('');
+    setToast(copy.shareInviteAdded);
   }
 
   function handleQuizClick() {
     setActivePanel('ai');
     setAiPrompt(copy.quizPrompt);
-    sidebarSectionRefs.current.ai?.scrollIntoView({ block: 'start' });
     setToast(copy.quizPrompt);
   }
 
   function handleSidebarTabClick(panelId) {
     setActivePanel(panelId);
-    sidebarSectionRefs.current[panelId]?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 
   function handleDeckTitleKeyDown(event) {
@@ -1649,111 +1952,108 @@ export default function SlideEditor({
           </div>
 
           <div className="slide-editor__sidebar-scroll">
-            <section
-              className="slide-editor__sidebar-section slide-editor__sidebar-section--ai"
-              ref={(node) => { sidebarSectionRefs.current.ai = node; }}
-            >
-              <div className="slide-editor__ai-box">
-              <textarea
-                value={aiPrompt}
-                placeholder={copy.aiPrompt}
-                onChange={(event) => setAiPrompt(event.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  addElement('text', {
-                    x: 14,
-                    y: 34,
-                    width: 72,
-                    height: 16,
-                    text: aiPrompt.trim() || copy.sampleText,
-                  });
-                  setAiPrompt('');
-                }}
-              >
-                {copy.generateText}
-              </button>
-              </div>
-            </section>
-
-            <section
-              className="slide-editor__sidebar-section"
-              ref={(node) => { sidebarSectionRefs.current.images = node; }}
-            >
-              <h2>{copy.imageTab}</h2>
-              <form className="slide-editor__image-search-form" onSubmit={handleImageSearch}>
-                <label className="slide-editor__search-field">
-                  <Icon name="search" size={18} />
-                  <input
-                    type="search"
-                    placeholder={copy.imagePrompt}
-                    value={imageQuery}
-                    onChange={(event) => setImageQuery(event.target.value)}
+            {activePanel === 'ai' && (
+              <section className="slide-editor__sidebar-section slide-editor__sidebar-section--ai">
+                <div className="slide-editor__ai-box">
+                  <textarea
+                    value={aiPrompt}
+                    placeholder={copy.aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value)}
                   />
-                </label>
-                <button
-                  type="submit"
-                  className="slide-editor__image-search-submit"
-                  disabled={isImageSearching}
-                >
-                  {isImageSearching ? '...' : copy.imageSearchButton}
-                </button>
-              </form>
-
-              {(imageSearchError || isImageSearching) && (
-                <p className="slide-editor__image-search-status" role="status">
-                  {isImageSearching ? 'Searching images...' : imageSearchError}
-                </p>
-              )}
-
-              <div className="slide-editor__image-grid">
-                {visibleImageResults.map((tile) => (
                   <button
-                    key={tile.resultId}
                     type="button"
-                    className="slide-editor__image-tile"
-                    style={{ backgroundColor: tile.color }}
-                    title={tile.label}
-                    aria-label={tile.label}
-                    onClick={() => addElement('image', {
-                      text: tile.label,
-                      fill: tile.color,
-                      src: tile.src,
-                      sourceUrl: tile.sourceUrl,
-                      alt: tile.label,
-                    })}
+                    onClick={() => {
+                      addElement('text', {
+                        x: 14,
+                        y: 34,
+                        width: 72,
+                        height: 16,
+                        text: aiPrompt.trim() || copy.sampleText,
+                      });
+                      setAiPrompt('');
+                    }}
                   >
-                    {tile.src ? (
-                      <img src={tile.src} alt={tile.label} loading="lazy" referrerPolicy="no-referrer" />
-                    ) : (
-                      <span className={`slide-editor__photo-thumb slide-editor__photo-thumb--${tile.thumbIndex}`}>
-                        <Icon name="image" size={18} />
-                      </span>
-                    )}
+                    {copy.generateText}
                   </button>
-                ))}
-              </div>
-            </section>
+                </div>
+              </section>
+            )}
 
-            <section
-              className="slide-editor__sidebar-section"
-              ref={(node) => { sidebarSectionRefs.current.layouts = node; }}
-            >
-              <h2>{copy.layoutTab}</h2>
-              <div className="slide-editor__layout-grid">
-                {LAYOUTS.map((layout) => (
+            {activePanel === 'images' && (
+              <section className="slide-editor__sidebar-section">
+                <h2>{copy.imageTab}</h2>
+                <form className="slide-editor__image-search-form" onSubmit={handleImageSearch}>
+                  <label className="slide-editor__search-field">
+                    <Icon name="search" size={18} />
+                    <input
+                      type="search"
+                      placeholder={copy.imagePrompt}
+                      value={imageQuery}
+                      onChange={(event) => setImageQuery(event.target.value)}
+                    />
+                  </label>
                   <button
-                    key={layout.id}
-                    type="button"
-                    onClick={() => applyLayout(layout.id)}
+                    type="submit"
+                    className="slide-editor__image-search-submit"
+                    disabled={isImageSearching}
                   >
-                    <span className={`slide-editor__layout-preview slide-editor__layout-preview--${layout.id}`} />
-                    <strong>{copy[layout.copyKey]}</strong>
+                    {isImageSearching ? '...' : copy.imageSearchButton}
                   </button>
-                ))}
-              </div>
-            </section>
+                </form>
+
+                {(imageSearchError || isImageSearching) && (
+                  <p className="slide-editor__image-search-status" role="status">
+                    {isImageSearching ? 'Searching images...' : imageSearchError}
+                  </p>
+                )}
+
+                <div className="slide-editor__image-grid">
+                  {visibleImageResults.map((tile) => (
+                    <button
+                      key={tile.resultId}
+                      type="button"
+                      className="slide-editor__image-tile"
+                      style={{ backgroundColor: tile.color }}
+                      title={tile.label}
+                      aria-label={tile.label}
+                      onClick={() => addElement('image', {
+                        text: tile.label,
+                        fill: tile.color,
+                        src: tile.src,
+                        sourceUrl: tile.sourceUrl,
+                        alt: tile.label,
+                      })}
+                    >
+                      {tile.src ? (
+                        <img src={tile.src} alt={tile.label} loading="lazy" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className={`slide-editor__photo-thumb slide-editor__photo-thumb--${tile.thumbIndex}`}>
+                          <Icon name="image" size={18} />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {activePanel === 'layouts' && (
+              <section className="slide-editor__sidebar-section">
+                <h2>{copy.layoutTab}</h2>
+                <div className="slide-editor__layout-grid">
+                  {LAYOUTS.map((layout) => (
+                    <button
+                      key={layout.id}
+                      type="button"
+                      onClick={() => applyLayout(layout.id)}
+                    >
+                      <span className={`slide-editor__layout-preview slide-editor__layout-preview--${layout.id}`} />
+                      <strong>{copy[layout.copyKey]}</strong>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </aside>
       </div>
@@ -1793,6 +2093,82 @@ export default function SlideEditor({
               {isSavingDeck ? copy.savingLabel : copy.saveLabel}
             </button>
           </form>
+        </div>
+      )}
+
+      {isShareDialogOpen && (
+        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.shareDialogTitle}>
+          <div className="slide-editor__share-dialog">
+            <div className="slide-editor__share-header">
+              <div>
+                <strong>{copy.shareDialogTitle}</strong>
+                <span>{copy.shareViewingCount}</span>
+              </div>
+              <button
+                type="button"
+                className="slide-editor__share-settings"
+                onClick={() => setIsShareDialogOpen(false)}
+              >
+                <Icon name="settings" size={20} />
+                {copy.closeShare}
+              </button>
+            </div>
+
+            <form className="slide-editor__share-add-user" onSubmit={handleAddShareInvite}>
+              <input
+                type="email"
+                value={shareInviteEmail}
+                placeholder={copy.shareAddUserPlaceholder}
+                onChange={(event) => setShareInviteEmail(event.target.value)}
+              />
+              <button type="submit">{copy.shareAddUser}</button>
+            </form>
+
+            <div className="slide-editor__share-user-row">
+              <span className="slide-editor__share-avatar">{copy.shareOwnerName.charAt(0)}</span>
+              <div>
+                <strong>{copy.shareOwnerName}</strong>
+                <small>{copy.shareOwnerRole}</small>
+              </div>
+              <button type="button" aria-label={copy.shareSettings}>
+                <Icon name="more" size={20} />
+              </button>
+            </div>
+
+            {shareInvitees.length > 0 && (
+              <div className="slide-editor__share-invitees">
+                {shareInvitees.map((email) => (
+                  <span key={email}>{email}</span>
+                ))}
+              </div>
+            )}
+
+            <div className="slide-editor__share-access">
+              <h2>{copy.shareAccessTitle}</h2>
+              <label>
+                <span className="slide-editor__share-access-icon">
+                  <Icon name={shareAccess === 'link' ? 'link' : 'lock'} size={22} />
+                </span>
+                <select
+                  value={shareAccess}
+                  onChange={handleShareAccessChange}
+                  disabled={isUpdatingShareAccess}
+                >
+                  <option value="private">{copy.sharePrivateAccess}</option>
+                  <option value="link">{copy.shareLinkAccess}</option>
+                </select>
+              </label>
+            </div>
+
+            <button
+              type="button"
+              className="slide-editor__share-copy"
+              onClick={copyShareLink}
+            >
+              <Icon name="link" size={22} />
+              {copy.shareCopyLink}
+            </button>
+          </div>
         </div>
       )}
 

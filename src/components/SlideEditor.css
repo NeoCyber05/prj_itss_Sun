@@ -1155,6 +1155,216 @@
   opacity: 0.72;
 }
 
+.slide-editor__share-dialog {
+  display: grid;
+  width: min(560px, 92vw);
+  gap: 18px;
+  padding: 22px;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.3);
+}
+
+.slide-editor__share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.slide-editor__share-header div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 22px;
+}
+
+.slide-editor__share-header strong {
+  color: #111827;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.slide-editor__share-header span {
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.slide-editor__share-settings {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #111827;
+  font-weight: 900;
+}
+
+.slide-editor__share-add-user {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.slide-editor__share-add-user input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid #94a3b8;
+  border-radius: var(--radius-sm);
+  color: #111827;
+  font-weight: 800;
+}
+
+.slide-editor__share-add-user input:focus {
+  border-color: var(--color-primary);
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.slide-editor__share-add-user button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.slide-editor__share-user-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.slide-editor__share-avatar {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #dbe3ec;
+  border-radius: 50%;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 900;
+}
+
+.slide-editor__share-user-row div {
+  display: grid;
+  gap: 2px;
+}
+
+.slide-editor__share-user-row strong {
+  color: #111827;
+  font-weight: 900;
+}
+
+.slide-editor__share-user-row small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.slide-editor__share-user-row button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #111827;
+}
+
+.slide-editor__share-user-row button:hover {
+  background: #f1f5f9;
+}
+
+.slide-editor__share-invitees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slide-editor__share-invitees span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.slide-editor__share-access {
+  display: grid;
+  gap: 12px;
+}
+
+.slide-editor__share-access h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.slide-editor__share-access label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.slide-editor__share-access-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #111827;
+}
+
+.slide-editor__share-access select {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #111827;
+  font-weight: 900;
+}
+
+.slide-editor__share-access select:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
+.slide-editor__share-copy {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.slide-editor__share-copy:hover {
+  background: var(--color-primary-hover);
+}
+
 .slide-editor__error {
   color: var(--color-error);
   font-weight: 800;

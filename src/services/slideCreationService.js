@@ -49,6 +49,10 @@ function normalizeDeck(template, slides) {
   };
 }
 
+function getTemplateTimeValue(template) {
+  return new Date(template.updated_at ?? template.created_at ?? 0).getTime();
+}
+
 function isPersistedUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     .test(String(value ?? ''));
@@ -146,6 +150,123 @@ export async function getDeckForEditor(templateId, userId) {
   }
 
   return normalizeDeck(template, slides ?? []);
+}
+
+export async function listSavedTemplates(userId) {
+  requireValue(userId, 'A signed-in user is required to load saved slides.');
+
+  const { data: templates, error: templateError } = await supabase
+    .from('templates')
+    .select('*')
+    .eq('owner_id', userId);
+
+  if (templateError) {
+    throw templateError;
+  }
+
+  const templateRows = templates ?? [];
+  const templateIds = templateRows.map((template) => template.id).filter(Boolean);
+  const slideCountByTemplateId = new Map();
+
+  if (templateIds.length > 0) {
+    const { data: slides, error: slidesError } = await supabase
+      .from('slide_pages')
+      .select('id,presentation_id')
+      .in('presentation_id', templateIds);
+
+    if (slidesError) {
+      throw slidesError;
+    }
+
+    for (const slide of slides ?? []) {
+      slideCountByTemplateId.set(
+        slide.presentation_id,
+        (slideCountByTemplateId.get(slide.presentation_id) ?? 0) + 1,
+      );
+    }
+  }
+
+  return templateRows
+    .map((template) => {
+      const normalizedTemplate = normalizeTemplate(template);
+
+      return {
+        ...normalizedTemplate,
+        slide_count: slideCountByTemplateId.get(template.id)
+          ?? normalizedTemplate.slide_count
+          ?? 0,
+      };
+    })
+    .sort((a, b) => getTemplateTimeValue(b) - getTemplateTimeValue(a));
+}
+
+export async function deleteSavedTemplate(templateId, userId) {
+  requireValue(templateId, 'A template id is required to delete a saved slide.');
+  requireValue(userId, 'A signed-in user is required to delete a saved slide.');
+
+  const { error: slideDeleteError } = await supabase
+    .from('slide_pages')
+    .delete()
+    .eq('presentation_id', templateId);
+
+  if (slideDeleteError) {
+    throw slideDeleteError;
+  }
+
+  const { error: presentationDeleteError } = await supabase
+    .from('presentations')
+    .delete()
+    .eq('id', templateId)
+    .eq('owner_id', userId);
+
+  if (presentationDeleteError) {
+    throw presentationDeleteError;
+  }
+
+  const { error: templateDeleteError } = await supabase
+    .from('templates')
+    .delete()
+    .eq('id', templateId)
+    .eq('owner_id', userId);
+
+  if (templateDeleteError) {
+    throw templateDeleteError;
+  }
+}
+
+export async function updateTemplateShareAccess({
+  templateId,
+  userId,
+  accessMode,
+}) {
+  requireValue(templateId, 'A template id is required to update sharing.');
+  requireValue(userId, 'A signed-in user is required to update sharing.');
+
+  const isPublic = accessMode === 'link' || accessMode === 'public';
+
+  const { data: template, error: templateError } = await supabase
+    .from('templates')
+    .update({ is_public: isPublic })
+    .eq('id', templateId)
+    .eq('owner_id', userId)
+    .select('*')
+    .single();
+
+  if (templateError) {
+    throw templateError;
+  }
+
+  const { error: presentationError } = await supabase
+    .from('presentations')
+    .update({ is_public: isPublic })
+    .eq('id', templateId)
+    .eq('owner_id', userId);
+
+  if (presentationError) {
+    throw presentationError;
+  }
+
+  return normalizeTemplate(template);
 }
 
 export async function saveDeckForEditor({

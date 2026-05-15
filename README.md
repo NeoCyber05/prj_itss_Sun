@@ -1,28 +1,71 @@
 # RakuSlide
 
-A React application for managing slide templates.
+Frontend React + Vite cho ứng dụng quản lý slide template.
 
-## Prerequisites
-- Node.js (v18 or higher recommended)
-- npm or yarn
+## Công nghệ chính
 
-## How to Run
+- React 19
+- Vite 8
+- Supabase JS
 
-1. Install dependencies
+## Yêu cầu
+
+- Node.js 18 trở lên
+- npm 9 trở lên
+
+## Biến môi trường
+
+Tạo file `.env` ở root project:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_or_publishable_key
+VITE_GOOGLE_CSE_API_KEY=your_google_custom_search_api_key
+VITE_GOOGLE_CSE_ID=your_google_programmable_search_engine_id
+```
+
+`VITE_GOOGLE_CSE_API_KEY` và `VITE_GOOGLE_CSE_ID` dùng cho chức năng tìm ảnh bằng Google Custom Search API.
+
+## Chạy project
+
+### 1. Cài đặt dependency
+
 ```bash
 npm install
 ```
 
-2. Start the development server
+### 2. Chạy dev server
+
 ```bash
 npm run dev
 ```
 
-3. Open your browser and navigate to the local URL provided in the terminal (usually http://localhost:5173).
+Vite sẽ in ra URL local, thường là:
 
-## Build for Production
+```text
+http://localhost:5173
+```
 
-To create a production build:
+### 3. Mở ứng dụng
+
+Truy cập URL Vite trong trình duyệt.
+
+## Lệnh hữu ích
+
+Chạy lint:
+
+```bash
+npm run lint
+```
+
+Build production:
+
 ```bash
 npm run build
+```
+
+Preview bản build:
+
+```bash
+npm run preview
 ```

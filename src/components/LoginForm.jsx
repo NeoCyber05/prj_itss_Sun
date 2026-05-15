@@ -47,7 +47,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     setError('');
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const errs = {};
@@ -68,12 +68,38 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
-    // ── Simulated login ──
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password,
+    });
+    setLoading(false);
+
+    if (signInError) {
+      setError(signInError.message);
+    } else {
       onLoginSuccess({ email: email.trim() });
-    }, 1200);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError('');
+    if (!email.trim()) {
+      setError(t('auth.errors.emailRequired'));
+      return;
+    }
+    
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    setLoading(false);
+
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      alert("Đã gửi link khôi phục! Vui lòng kiểm tra email của bạn.");
+    }
   }
 
   return (
@@ -126,7 +152,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
         className="auth-card__link--forgot"
         id="forgotPasswordLink"
         type="button"
-        onClick={() => alert(t('auth.forgotPasswordAlert'))}
+        onClick={handleForgotPassword}
       >
         {t('auth.forgotPassword')}
       </button>

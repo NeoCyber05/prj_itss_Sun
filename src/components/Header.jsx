@@ -137,8 +137,8 @@ export default function Header({
           <>
             <button
               type="button"
-              className="btn-my-slides"
-              onClick={() => alert(t('home.mySlidesAlert'))}
+              className={`btn-my-slides${currentView === 'my-slides' ? ' btn-my-slides--active' : ''}`}
+              onClick={() => onViewChange('my-slides')}
             >
               {t('header.mySlides')}
             </button>

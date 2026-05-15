@@ -1,0 +1,339 @@
+.my-slides {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 44px;
+}
+
+.my-slides__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.my-slides__eyebrow {
+  margin: 0 0 6px;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.my-slides__header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+
+.my-slides__sort {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.my-slides__sort select {
+  height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #111827;
+  font-weight: 800;
+}
+
+.my-slides__error,
+.my-slides__status,
+.my-slides__empty {
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.my-slides__error {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.my-slides__status {
+  padding: 28px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.my-slides__empty {
+  display: grid;
+  gap: 8px;
+  padding: 36px;
+  text-align: center;
+}
+
+.my-slides__empty h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.25rem;
+}
+
+.my-slides__empty p {
+  margin: 0;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.my-slides__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.my-slide-card {
+  overflow: hidden;
+  border: 1px solid #d7e0ea;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
+}
+
+.my-slide-card__preview {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: #e8f0f8;
+}
+
+.my-slide-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-slides-preview-fallback {
+  display: grid;
+  height: 100%;
+  align-content: center;
+  gap: 10px;
+  padding: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.12)),
+    linear-gradient(135deg, #cfe0ee 0%, #f1f7fb 54%, #dce7cf 100%);
+  color: #172033;
+}
+
+.my-slides-preview-fallback span {
+  width: 42px;
+  height: 6px;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.my-slides-preview-fallback strong {
+  max-width: 100%;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.my-slides-preview-fallback small {
+  color: #334155;
+  font-weight: 800;
+}
+
+.my-slide-card__body {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.my-slide-card__body h2 {
+  display: -webkit-box;
+  margin: 0 0 6px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 1.02rem;
+  font-weight: 900;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.my-slide-card__body p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.my-slide-card__access {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.my-slide-card__access--link {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.my-slide-card__access--private {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.my-slide-card__access--invited {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.my-slide-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.my-slide-card__actions button,
+.my-slides__access-list button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #9fb0c1;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #172033;
+  font-weight: 900;
+}
+
+.my-slide-card__actions button:hover,
+.my-slides__access-list button:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.my-slide-card__actions .my-slide-card__delete,
+.my-slides__access-list .my-slides__table-delete {
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.my-slide-card__actions .my-slide-card__delete:hover,
+.my-slides__access-list .my-slides__table-delete:hover {
+  border-color: #dc2626;
+  background: #fff7f7;
+  color: #991b1b;
+}
+
+.my-slide-card__actions button:disabled,
+.my-slides__access-list button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.my-slides__access-list {
+  margin-top: 34px;
+}
+
+.my-slides__access-list h2 {
+  margin: 0 0 12px;
+  color: #111827;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.my-slides__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.my-slides__access-list table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.my-slides__access-list th {
+  background: #2f7fb9;
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.my-slides__access-list th,
+.my-slides__access-list td {
+  padding: 10px 12px;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.my-slides__access-list th:last-child,
+.my-slides__access-list td:last-child {
+  border-right: none;
+}
+
+.my-slides__access-list tr:last-child td {
+  border-bottom: none;
+}
+
+.my-slides__access-list td {
+  color: #172033;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.my-slides__access-list td:last-child {
+  display: flex;
+  gap: 8px;
+}
+
+.my-slides__access-list button {
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+@media (max-width: 980px) {
+  .my-slides__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .my-slides {
+    padding: 22px 14px 34px;
+  }
+
+  .my-slides__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .my-slides__sort {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .my-slides__sort select {
+    width: 100%;
+  }
+
+  .my-slides__grid {
+    grid-template-columns: 1fr;
+  }
+}

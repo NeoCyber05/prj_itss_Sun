@@ -148,6 +148,15 @@
   background: #eff6ff;
 }
 
+.btn-my-slides--active {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.btn-my-slides--active:hover {
+  background: var(--color-primary-hover);
+}
+
 .header__user-lang {
   display: flex;
   align-items: center;

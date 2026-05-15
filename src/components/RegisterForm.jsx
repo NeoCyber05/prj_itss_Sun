@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
-import { UserIcon, MailIcon, LockIcon, GoogleIcon, FacebookIcon } from './Icons';
+import { UserIcon, MailIcon, LockIcon, GoogleIcon, FacebookIcon, CheckIcon } from './Icons';
 import { supabase } from '../supabaseClient';
 import './AuthCard.css';
 
@@ -19,6 +19,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   async function handleSocialLogin(provider) {
     setError('');
@@ -49,7 +50,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
     setError('');
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const errs = {};
@@ -91,13 +92,43 @@ export default function RegisterForm({ onSwitchToLogin }) {
       return;
     }
 
-    // ── Simulated register ──
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      alert(t('auth.registerSuccess'));
-      onSwitchToLogin();
-    }, 1200);
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          full_name: name.trim(),
+        }
+      }
+    });
+
+    setLoading(false);
+
+    if (signUpError) {
+      setError(signUpError.message);
+    } else {
+      setSuccess(true);
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 2000);
+    }
+  }
+
+  if (success) {
+    return (
+      <section className="auth-card auth-card--success" id="registerCard">
+        <div className="auth-card__success-icon">
+          <CheckIcon />
+        </div>
+        <h2 className="auth-card__title" style={{ marginBottom: '8px' }}>
+          {t('auth.registerSuccess').replace(' (demo)', '')}
+        </h2>
+        <p className="auth-card__success-text">
+          Đang chuyển hướng đến trang đăng nhập...
+        </p>
+      </section>
+    );
   }
 
   return (

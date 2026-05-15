@@ -3,6 +3,7 @@ import Header from './components/Header';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Home from './components/Home';
+import MySlides from './components/MySlides';
 import SlideEditor from './components/SlideEditor';
 import { useLanguage } from './i18n/LanguageContext.jsx';
 import { supabase } from './supabaseClient';
@@ -126,7 +127,7 @@ export default function App() {
   function handleViewChange(nextView) {
     setView(nextView);
 
-    if (nextView === 'home') {
+    if (nextView === 'home' || nextView === 'my-slides') {
       setSearchQuery('');
       setSubmittedSearchQuery('');
       setIsSearchActive(false);
@@ -172,6 +173,13 @@ export default function App() {
     }
   }
 
+  function handleOpenSavedTemplate(templateId) {
+    setActiveDeck(null);
+    setActiveTemplateId(templateId);
+    setEditorHash(templateId);
+    setView('editor');
+  }
+
   function handleBackHomeFromEditor() {
     setView('home');
     setActiveDeck(null);
@@ -203,6 +211,12 @@ export default function App() {
             onCreateNewSlide={handleCreateNewSlide}
             isCreatingSlide={isCreatingSlide}
             createSlideError={createSlideError}
+          />
+        )}
+        {view === 'my-slides' && (
+          <MySlides
+            currentUserId={user?.id}
+            onOpenTemplate={handleOpenSavedTemplate}
           />
         )}
         {view === 'editor' && (
