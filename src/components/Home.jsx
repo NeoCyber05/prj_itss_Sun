@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
+import { listRecentlyOpenedTemplates } from '../services/slideCreationService.js';
 import { filterTemplates, sortTemplates } from '../utils/templateSearch';
+import SlidePreviewThumbnail from './SlidePreviewThumbnail.jsx';
 import './Home.css';
 
 const popularSlides = [
@@ -169,8 +171,6 @@ const searchTemplates = [
   },
 ];
 
-const recentSlides = popularSlides.slice(0, 4);
-
 const recommendedTemplates = [
   {
     id: 'recommended-1',
@@ -208,11 +208,47 @@ const recommendedTemplates = [
 
 const sortOptionIds = ['name', 'created', 'rating', 'views'];
 
-function SlideCard({ title, image, date, slides, views, t }) {
+function formatDate(value, language) {
+  if (!value) return '';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'ja-JP', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getRecentTemplateCard(template, language) {
+  return {
+    id: template.id,
+    title: template.title,
+    firstSlide: template.first_slide,
+    image: template.thumbnail_url,
+    date: formatDate(template.last_opened_at ?? template.updated_at ?? template.created_at, language),
+    slides: template.slide_count ?? template.page_count ?? 0,
+    template,
+    views: '',
+  };
+}
+
+function SlideCard({ template, title, firstSlide, image, date, slides, views, t, onOpenTemplate }) {
   return (
-    <article className="template-card">
+    <button type="button" className="template-card" onClick={() => onOpenTemplate?.(template)}>
       <div className="template-card-image">
-        <img src={image} alt={title} />
+        {firstSlide ? (
+          <SlidePreviewThumbnail slide={firstSlide} title={title} />
+        ) : image ? (
+          <img src={image} alt={title} />
+        ) : (
+          <div className="template-card-image__fallback" aria-hidden="true">
+            <span />
+            <strong>{title}</strong>
+          </div>
+        )}
       </div>
       <div className="template-card-content">
         <h3 className="template-card-title">{title}</h3>
@@ -231,25 +267,77 @@ function SlideCard({ title, image, date, slides, views, t }) {
           )}
         </div>
       </div>
-    </article>
+    </button>
   );
 }
 
 export default function Home({
+  currentUserId,
   isLoggedIn,
   submittedSearchQuery,
   isSearchActive,
   onCreateNewSlide,
+  onOpenTemplate,
+  onOpenRecentTemplate,
   isCreatingSlide,
   createSlideError,
+  refreshKey = 0,
 }) {
   const { language, t } = useLanguage();
   const [activeSort, setActiveSort] = useState('name');
+  const [recentTemplates, setRecentTemplates] = useState([]);
+  const [recentError, setRecentError] = useState('');
+  const [isRecentLoading, setIsRecentLoading] = useState(false);
   const hasSearchQuery = submittedSearchQuery.length > 0;
   const showSearchResults = isSearchActive && hasSearchQuery;
   const showGuestLanding = !isLoggedIn && !showSearchResults;
   const showLoggedInDashboard = isLoggedIn && !showSearchResults;
   const showLibraryHeader = showSearchResults;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve()
+      .then(() => {
+        if (!isMounted) return [];
+
+        if (!currentUserId || !showLoggedInDashboard) {
+          setRecentTemplates([]);
+          setRecentError('');
+          setIsRecentLoading(false);
+          return [];
+        }
+
+        setIsRecentLoading(true);
+        setRecentError('');
+        return listRecentlyOpenedTemplates(currentUserId);
+      })
+      .then((templates) => {
+        if (isMounted) {
+          setRecentTemplates(templates);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setRecentTemplates([]);
+          setRecentError(t('home.recentSlidesError', { message: error.message }));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsRecentLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUserId, showLoggedInDashboard, t, refreshKey]);
+
+  const recentSlides = useMemo(
+    () => recentTemplates.map((template) => getRecentTemplateCard(template, language)),
+    [language, recentTemplates],
+  );
 
   const templates = useMemo(() => {
     if (showGuestLanding) {
@@ -285,19 +373,30 @@ export default function Home({
 
           <section className="home-section">
             <h2 className="home-section-title">{t('home.recentSlides')}</h2>
-            <div className="home-grid">
-              {recentSlides.map((slide) => (
-                <SlideCard
-                  key={slide.id}
-                  title={slide.title}
-                  image={slide.image}
-                  date={slide.date}
-                  slides={slide.slides}
-                  views={slide.views}
-                  t={t}
-                />
-              ))}
-            </div>
+            {isRecentLoading ? (
+              <div className="home-status">{t('home.recentSlidesLoading')}</div>
+            ) : recentError ? (
+              <div className="home-create-error" role="alert">{recentError}</div>
+            ) : recentSlides.length > 0 ? (
+              <div className="home-grid">
+                {recentSlides.map((slide) => (
+                  <SlideCard
+                    key={slide.id}
+                    template={slide.template}
+                    title={slide.title}
+                    firstSlide={slide.firstSlide}
+                    image={slide.image}
+                    date={slide.date}
+                    slides={slide.slides}
+                    views={slide.views}
+                    t={t}
+                    onOpenTemplate={(template) => onOpenRecentTemplate?.(template.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="home-status">{t('home.recentSlidesEmpty')}</div>
+            )}
           </section>
 
           <section className="home-section">
@@ -324,12 +423,14 @@ export default function Home({
               {recommendedTemplates.map((template) => (
                 <SlideCard
                   key={template.id}
+                  template={template}
                   title={template.title}
                   image={template.image}
                   date={template.date}
                   slides={template.slides}
                   views={template.views}
                   t={t}
+                  onOpenTemplate={onOpenTemplate}
                 />
               ))}
             </div>
@@ -365,12 +466,14 @@ export default function Home({
           {templates.map((template) => (
             <SlideCard
               key={template.id}
+              template={template}
               title={template.title}
               image={template.image}
               date={template.date}
               slides={template.slides}
               views={template.views}
               t={t}
+              onOpenTemplate={onOpenTemplate}
             />
           ))}
         </div>

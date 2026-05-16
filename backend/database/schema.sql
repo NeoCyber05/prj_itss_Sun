@@ -50,6 +50,24 @@ create index if not exists idx_slide_templates_status_visibility
 create index if not exists idx_template_slides_template_id_position
   on public.template_slides(template_id, position);
 
+-- Frontend runtime tables use templates / presentations / slide_pages.
+-- Track when a user opens a saved deck so the Home page can show real recent slides.
+alter table if exists public.templates
+  add column if not exists last_opened_at timestamptz;
+
+alter table if exists public.presentations
+  add column if not exists last_opened_at timestamptz;
+
+do $$
+begin
+  if to_regclass('public.templates') is not null then
+    create index if not exists idx_templates_owner_last_opened_at
+      on public.templates(owner_id, last_opened_at desc)
+      where last_opened_at is not null;
+  end if;
+end;
+$$;
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql

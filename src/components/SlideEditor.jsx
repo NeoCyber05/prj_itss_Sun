@@ -5,6 +5,7 @@ import {
   saveDeckForEditor,
   updateTemplateShareAccess,
 } from '../services/slideCreationService.js';
+import { generateSlideDraftWithGemini } from '../services/geminiSlideService.js';
 import './SlideEditor.css';
 
 const EDITOR_COPY = {
@@ -26,6 +27,9 @@ const EDITOR_COPY = {
     imageTab: '画像検索',
     layoutTab: 'レイアウト',
     aiPrompt: 'AIにテキストを生成させる...',
+    aiGenerating: 'Generating...',
+    aiGenerated: 'AI draft generated',
+    aiGenerateError: 'Could not generate AI draft: {{message}}',
     imagePrompt: '画像を検索...',
     imageTile: '画像',
     imageSearchButton: '検索',
@@ -83,6 +87,37 @@ const EDITOR_COPY = {
     shareInviteAdded: 'ユーザーを追加しました',
     shareInviteEmpty: 'メールアドレスを入力してください',
     closeShare: '閉じる',
+    uploadImageLabel: 'Upload image',
+    copySelection: 'Copy',
+    copiedSelection: 'Copied selected object',
+    invalidImageFile: 'Please choose an image file.',
+    tableDialogTitle: 'Add table',
+    rowLabel: 'Rows',
+    columnLabel: 'Columns',
+    insertTable: 'Insert table',
+    tableSizeError: 'Rows and columns must be from 1 to 20.',
+    chartDialogTitle: 'Add chart',
+    chartTitleLabel: 'Title',
+    chartLabelsLabel: 'Labels',
+    chartValuesLabel: 'Values',
+    chartLabelsPlaceholder: 'Q1, Q2, Q3, Q4',
+    chartValuesPlaceholder: '120, 180, 150, 240',
+    insertChart: 'Insert chart',
+    chartValuesError: 'Enter numeric values separated by commas.',
+    linkLabel: 'Link',
+    linkDialogTitle: 'Add link',
+    linkUrlLabel: 'URL',
+    linkUrlPlaceholder: 'https://example.com',
+    applyLink: 'Apply',
+    removeLink: 'Remove',
+    invalidLink: 'Enter a valid URL.',
+    underlineColorLabel: 'Underline color',
+    previewPrevious: 'Previous',
+    previewNext: 'Next',
+    quizDialogTitle: 'Quiz',
+    quizQuestionLabel: 'Question',
+    quizAnswerLabel: 'Answer',
+    closeQuiz: 'Close',
   },
   vi: {
     backShort: 'Trang chủ',
@@ -102,6 +137,9 @@ const EDITOR_COPY = {
     imageTab: 'Tìm ảnh',
     layoutTab: 'Bố cục',
     aiPrompt: 'Nhập nội dung muốn tạo...',
+    aiGenerating: 'Đang tạo...',
+    aiGenerated: 'Đã tạo bản nháp bằng AI',
+    aiGenerateError: 'Không thể tạo bản nháp AI: {{message}}',
     imagePrompt: 'Tìm kiếm ảnh...',
     imageTile: 'Ảnh',
     imageSearchButton: 'Tìm',
@@ -159,14 +197,45 @@ const EDITOR_COPY = {
     shareInviteAdded: 'Đã thêm người dùng',
     shareInviteEmpty: 'Nhập email người dùng cần thêm',
     closeShare: 'Đóng',
+    uploadImageLabel: 'Tải ảnh lên',
+    copySelection: 'Sao chép',
+    copiedSelection: 'Đã sao chép đối tượng đang chọn',
+    invalidImageFile: 'Vui lòng chọn tệp ảnh.',
+    tableDialogTitle: 'Thêm bảng',
+    rowLabel: 'Số hàng',
+    columnLabel: 'Số cột',
+    insertTable: 'Chèn bảng',
+    tableSizeError: 'Số hàng và cột phải từ 1 đến 20.',
+    chartDialogTitle: 'Thêm biểu đồ',
+    chartTitleLabel: 'Tiêu đề',
+    chartLabelsLabel: 'Nhãn',
+    chartValuesLabel: 'Giá trị',
+    chartLabelsPlaceholder: 'Q1, Q2, Q3, Q4',
+    chartValuesPlaceholder: '120, 180, 150, 240',
+    insertChart: 'Chèn biểu đồ',
+    chartValuesError: 'Nhập các số, phân tách bằng dấu phẩy.',
+    linkLabel: 'Liên kết',
+    linkDialogTitle: 'Thêm liên kết',
+    linkUrlLabel: 'URL',
+    linkUrlPlaceholder: 'https://example.com',
+    applyLink: 'Áp dụng',
+    removeLink: 'Xóa',
+    invalidLink: 'Nhập URL hợp lệ.',
+    underlineColorLabel: 'Màu gạch chân',
+    previewPrevious: 'Trước',
+    previewNext: 'Tiếp',
+    quizDialogTitle: 'Quiz',
+    quizQuestionLabel: 'Câu hỏi',
+    quizAnswerLabel: 'Đáp án',
+    closeQuiz: 'Đóng',
   },
 };
 
 const TOOL_ITEMS = [
   { id: 'text', icon: 'type', copyKey: 'toolText' },
   { id: 'image', icon: 'image', copyKey: 'toolImage' },
+  { id: 'copy', icon: 'copy', copyKey: 'copySelection' },
   { id: 'shape', icon: 'shape', copyKey: 'toolShape' },
-  { id: 'frame', icon: 'frame', copyKey: 'toolFrame' },
   { id: 'table', icon: 'table', copyKey: 'toolTable' },
   { id: 'chart', icon: 'chart', copyKey: 'toolChart' },
 ];
@@ -180,10 +249,59 @@ const SIDEBAR_TABS = [
 const LAYOUTS = [
   { id: 'title', copyKey: 'titleLayout' },
   { id: 'section', copyKey: 'sectionLayout' },
-  { id: 'chart', copyKey: 'chartLayout' },
   { id: 'table', copyKey: 'tableLayout' },
   { id: 'two-column', copyKey: 'twoColumnLayout' },
+  { id: 'title-image', labels: { ja: 'Title + image', vi: 'Tiêu đề + ảnh' } },
+  { id: 'image-left', labels: { ja: 'Image + text', vi: 'Ảnh + nội dung' } },
+  { id: 'comparison', labels: { ja: 'Comparison', vi: 'So sánh' } },
+  { id: 'cards', labels: { ja: '3 cards', vi: '3 thẻ' } },
   { id: 'blank', copyKey: 'blankLayout' },
+];
+
+const TEXT_FONT_FAMILIES = [
+  { label: 'Sans', value: 'Inter, Arial, sans-serif' },
+  { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
+  { label: 'Mono', value: '"Courier New", monospace' },
+  { label: 'Display', value: 'Impact, Haettenschweiler, sans-serif' },
+];
+
+const DEFAULT_TEXT_FONT_FAMILY = TEXT_FONT_FAMILIES[0].value;
+const MIN_TABLE_SIZE = 1;
+const MAX_TABLE_SIZE = 20;
+const DEFAULT_TABLE_ROWS = 3;
+const DEFAULT_TABLE_COLUMNS = 4;
+const DEFAULT_CHART_VALUES = [120, 180, 150, 240];
+const AI_TEXT_LABEL = '\u00dd ch\u00ednh';
+const AI_NOTES_LABEL = 'Ghi ch\u00fa';
+const AI_DRAFT_LABEL = 'AI draft';
+const AI_SLIDE_PALETTES = [
+  {
+    accent: '#2563eb',
+    accentSoft: '#dbeafe',
+    panel: '#f8fbff',
+    note: '#ecfeff',
+    noteBorder: '#67e8f9',
+    title: '#0f172a',
+    body: '#1e293b',
+  },
+  {
+    accent: '#0f766e',
+    accentSoft: '#ccfbf1',
+    panel: '#f7fffb',
+    note: '#f0fdfa',
+    noteBorder: '#5eead4',
+    title: '#134e4a',
+    body: '#1f2937',
+  },
+  {
+    accent: '#b45309',
+    accentSoft: '#fef3c7',
+    panel: '#fffaf0',
+    note: '#fff7ed',
+    noteBorder: '#fdba74',
+    title: '#451a03',
+    body: '#334155',
+  },
 ];
 
 const IMAGE_TILES = [
@@ -235,6 +353,137 @@ function clamp(value, min, max) {
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createTableCells(rows = DEFAULT_TABLE_ROWS, columns = DEFAULT_TABLE_COLUMNS) {
+  return Array.from({ length: rows * columns }, (_, index) => (
+    index < columns ? `H${index + 1}` : ''
+  ));
+}
+
+function normalizeTableConfig(raw = {}) {
+  const rows = clamp(Number(raw.rows ?? DEFAULT_TABLE_ROWS), MIN_TABLE_SIZE, MAX_TABLE_SIZE);
+  const columns = clamp(Number(raw.columns ?? raw.cols ?? DEFAULT_TABLE_COLUMNS), MIN_TABLE_SIZE, MAX_TABLE_SIZE);
+  const cellCount = rows * columns;
+  const sourceCells = Array.isArray(raw.cells) ? raw.cells : [];
+  const defaultCells = createTableCells(rows, columns);
+
+  return {
+    rows,
+    columns,
+    cells: Array.from({ length: cellCount }, (_, index) => (
+      String(sourceCells[index] ?? defaultCells[index] ?? '')
+    )),
+  };
+}
+
+function parseNumberList(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item));
+}
+
+function parseLabelList(value, count) {
+  const labels = String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return Array.from({ length: count }, (_, index) => labels[index] || `C${index + 1}`);
+}
+
+function normalizeChartConfig(raw = {}, copy) {
+  const values = Array.isArray(raw.values)
+    ? raw.values.map(Number).filter((item) => Number.isFinite(item))
+    : DEFAULT_CHART_VALUES;
+  const safeValues = values.length ? values : DEFAULT_CHART_VALUES;
+  const labels = Array.isArray(raw.labels) && raw.labels.length
+    ? raw.labels.map((label) => String(label))
+    : parseLabelList('', safeValues.length);
+
+  return {
+    title: raw.title || copy?.chartLabel || 'Chart',
+    labels: parseLabelList(labels.join(','), safeValues.length),
+    values: safeValues,
+  };
+}
+
+function normalizeLinkUrl(value) {
+  const url = String(value ?? '').trim();
+
+  if (!url) return '';
+
+  try {
+    const candidate = /^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`;
+    const parsedUrl = new URL(candidate);
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) return '';
+
+    return parsedUrl.href;
+  } catch {
+    return '';
+  }
+}
+
+function cloneEditorElement(element) {
+  return {
+    ...element,
+    id: makeId(element.type || 'element'),
+    x: clamp((element.x ?? 10) + 4, 0, 100 - (element.width ?? 20)),
+    y: clamp((element.y ?? 10) + 4, 0, 100 - (element.height ?? 10)),
+    style: {
+      ...(element.style ?? {}),
+    },
+    chart: element.chart
+      ? {
+          ...element.chart,
+          labels: [...(element.chart.labels ?? [])],
+          values: [...(element.chart.values ?? [])],
+        }
+      : undefined,
+    table: element.table
+      ? {
+          ...element.table,
+          cells: [...(element.table.cells ?? [])],
+        }
+      : undefined,
+  };
+}
+
+function getSlidePlainText(slide) {
+  return (slide?.elements ?? [])
+    .filter((element) => element.type === 'text')
+    .map((element) => element.text?.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function buildQuizQuestions(slide, fallbackTitle, copy) {
+  const slideText = getSlidePlainText(slide);
+  const title = getSlideDisplayTitle(slide, fallbackTitle);
+  const subject = slideText || title;
+  const hasChart = slide?.elements?.some((element) => element.type === 'chart');
+  const hasTable = slide?.elements?.some((element) => element.type === 'table');
+
+  return [
+    {
+      question: `Nội dung chính của slide "${title}" là gì?`,
+      answer: subject,
+    },
+    {
+      question: hasChart
+        ? 'Biểu đồ trong slide đang thể hiện xu hướng nào?'
+        : 'Tiêu đề nào phù hợp nhất với slide này?',
+      answer: hasChart ? 'Người học cần đọc dữ liệu trên biểu đồ và rút ra xu hướng chính.' : title,
+    },
+    {
+      question: hasTable
+        ? 'Bảng dữ liệu trong slide dùng để so sánh thông tin nào?'
+        : copy.quizPrompt,
+      answer: hasTable ? 'Người học cần dựa vào các hàng và cột trong bảng để trả lời.' : subject,
+    },
+  ];
 }
 
 function slugForKey(value) {
@@ -503,6 +752,8 @@ function normalizeElement(raw, index, copy) {
       ...base.style,
       ...(raw?.style ?? {}),
     },
+    chart: type === 'chart' ? normalizeChartConfig(raw?.chart, copy) : raw?.chart,
+    table: type === 'table' ? normalizeTableConfig(raw?.table) : raw?.table,
   };
 }
 
@@ -559,6 +810,7 @@ function createElement(type, copy, index = 0, overrides = {}) {
       align: 'left',
       bold: false,
       color: '#111827',
+      fontFamily: DEFAULT_TEXT_FONT_FAMILY,
       fontSize: 18,
       italic: false,
       underline: false,
@@ -612,6 +864,7 @@ function createElement(type, copy, index = 0, overrides = {}) {
       height: 28,
       text: copy.tableLabel,
       ...overrides,
+      table: normalizeTableConfig(overrides.table),
     };
   }
 
@@ -624,6 +877,7 @@ function createElement(type, copy, index = 0, overrides = {}) {
       height: 34,
       text: copy.chartLabel,
       ...overrides,
+      chart: normalizeChartConfig(overrides.chart, copy),
     };
   }
 
@@ -697,7 +951,261 @@ function buildLayoutElements(layoutId, templateTitle, copy) {
     ];
   }
 
+  if (layoutId === 'title-image') {
+    return [
+      ...title,
+      createElement('image', copy, 2, {
+        x: 14,
+        y: 34,
+        width: 72,
+        height: 38,
+      }),
+    ];
+  }
+
+  if (layoutId === 'image-left') {
+    return [
+      ...title,
+      createElement('image', copy, 2, {
+        x: 10,
+        y: 36,
+        width: 36,
+        height: 30,
+      }),
+      createElement('text', copy, 3, {
+        x: 54,
+        y: 38,
+        width: 34,
+        height: 26,
+        text: copy.sampleText,
+      }),
+    ];
+  }
+
+  if (layoutId === 'comparison') {
+    return [
+      ...title,
+      createElement('shape', copy, 2, {
+        x: 10,
+        y: 36,
+        width: 36,
+        height: 30,
+        text: 'A',
+        fill: '#eff6ff',
+      }),
+      createElement('shape', copy, 3, {
+        x: 54,
+        y: 36,
+        width: 36,
+        height: 30,
+        text: 'B',
+        fill: '#f8fafc',
+      }),
+    ];
+  }
+
+  if (layoutId === 'cards') {
+    return [
+      ...title,
+      ...[0, 1, 2].map((cardIndex) => createElement('text', copy, cardIndex + 2, {
+        x: 10 + cardIndex * 28,
+        y: 38,
+        width: 24,
+        height: 26,
+        text: copy.sampleText,
+        style: {
+          align: 'center',
+          bold: true,
+          color: '#111827',
+          fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+          fontSize: 16,
+          italic: false,
+          underline: false,
+        },
+      })),
+    ];
+  }
+
   return title;
+}
+
+function createAiShape(copy, index, overrides = {}) {
+  return createElement('shape', copy, index, {
+    text: '',
+    stroke: 'transparent',
+    ...overrides,
+  });
+}
+
+function createAiText(copy, index, overrides = {}) {
+  const style = overrides.style ?? {};
+
+  return createElement('text', copy, index, {
+    ...overrides,
+    style: {
+      align: 'left',
+      bold: false,
+      color: '#111827',
+      fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+      fontSize: 18,
+      italic: false,
+      underline: false,
+      verticalAlign: 'top',
+      lineHeight: 1.18,
+      ...style,
+    },
+  });
+}
+
+function buildAiDraftSlides(generatedDeck, copy) {
+  const deckTitle = generatedDeck.deckTitle || copy.defaultTitle;
+  const sourceSlides = generatedDeck.slides?.length
+    ? generatedDeck.slides
+    : [{ title: deckTitle, bullets: [copy.sampleText], speakerNotes: '' }];
+
+  return sourceSlides.map((slide, index) => {
+    const palette = AI_SLIDE_PALETTES[index % AI_SLIDE_PALETTES.length];
+    const title = slide.title || `${deckTitle} ${index + 1}`;
+    const bullets = (slide.bullets ?? [])
+      .map((bullet) => String(bullet ?? '').trim())
+      .filter(Boolean);
+    const speakerNotes = String(slide.speakerNotes ?? '').trim();
+    const hasNotes = Boolean(speakerNotes);
+    const bulletText = bullets.length
+      ? bullets.map((bullet) => `\u2022 ${bullet}`).join('\n')
+      : copy.sampleText;
+    const bodyWidth = hasNotes ? 52 : 74;
+    const titleFontSize = title.length > 42 ? 25 : 30;
+    const bodyFontSize = bullets.length > 4 ? 13 : 15;
+    const noteFontSize = speakerNotes.length > 220 ? 11 : 12;
+
+    return {
+      id: makeId('ai-slide'),
+      position: index + 1,
+      title,
+      elements: [
+        createAiShape(copy, 0, {
+          x: 78,
+          y: 8,
+          width: 14,
+          height: 9,
+          fill: palette.accentSoft,
+        }),
+        createAiShape(copy, 1, {
+          x: 4,
+          y: 8,
+          width: 2.4,
+          height: 84,
+          fill: palette.accent,
+          stroke: palette.accent,
+        }),
+        createAiShape(copy, 2, {
+          x: 8,
+          y: 30,
+          width: bodyWidth,
+          height: 56,
+          fill: palette.panel,
+          stroke: palette.accentSoft,
+        }),
+        ...(hasNotes ? [
+          createAiShape(copy, 3, {
+            x: 63,
+            y: 30,
+            width: 29,
+            height: 56,
+            fill: palette.note,
+            stroke: palette.noteBorder,
+          }),
+        ] : []),
+        createAiText(copy, 4, {
+          x: 8,
+          y: 8,
+          width: 74,
+          height: 14,
+          text: title,
+          style: {
+            bold: true,
+            color: palette.title,
+            fontSize: titleFontSize,
+            lineHeight: 1.05,
+          },
+        }),
+        createAiText(copy, 5, {
+          x: 8,
+          y: 23,
+          width: 44,
+          height: 5,
+          text: `${AI_DRAFT_LABEL} / ${String(index + 1).padStart(2, '0')}`,
+          style: {
+            bold: true,
+            color: palette.accent,
+            fontSize: 10,
+            lineHeight: 1,
+          },
+        }),
+        createAiShape(copy, 6, {
+          x: 8,
+          y: 27,
+          width: 18,
+          height: 1.4,
+          fill: palette.accent,
+          stroke: palette.accent,
+        }),
+        createAiText(copy, 7, {
+          x: 11,
+          y: 34,
+          width: bodyWidth - 6,
+          height: 6,
+          text: AI_TEXT_LABEL,
+          style: {
+            bold: true,
+            color: palette.accent,
+            fontSize: 12,
+            lineHeight: 1,
+          },
+        }),
+        createAiText(copy, 8, {
+          x: 11,
+          y: 42,
+          width: bodyWidth - 6,
+          height: 38,
+          text: bulletText,
+          style: {
+            color: palette.body,
+            fontSize: bodyFontSize,
+            lineHeight: 1.28,
+          },
+        }),
+        ...(hasNotes ? [
+          createAiText(copy, 9, {
+            x: 66,
+            y: 34,
+            width: 23,
+            height: 6,
+            text: AI_NOTES_LABEL,
+            style: {
+              bold: true,
+              color: palette.accent,
+              fontSize: 12,
+              lineHeight: 1,
+            },
+          }),
+          createAiText(copy, 10, {
+            x: 66,
+            y: 42,
+            width: 23,
+            height: 39,
+            text: speakerNotes,
+            style: {
+              color: palette.body,
+              fontSize: noteFontSize,
+              lineHeight: 1.22,
+            },
+          }),
+        ] : []),
+      ],
+    };
+  });
 }
 
 function buildEditableSlides(sourceSlides, template, copy) {
@@ -773,17 +1281,22 @@ function Icon({ name, size = 22 }) {
     case 'image':
       return (
         <svg {...common}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <circle cx="8" cy="10" r="1.5" />
-          <path d="M21 15l-5-5L5 19" />
-          <path d="M15 5h4v4" />
+          <rect x="3.5" y="4" width="17" height="16" rx="1.6" />
+          <circle cx="8" cy="9" r="1.6" />
+          <path d="M4 17l5.2-5.2 3.6 3.6 3.2-3.8 4 5.4" />
+        </svg>
+      );
+    case 'copy':
+      return (
+        <svg {...common}>
+          <rect x="4" y="5" width="12" height="12" rx="1.4" />
+          <rect x="9" y="10" width="12" height="12" rx="1.4" />
         </svg>
       );
     case 'shape':
       return (
         <svg {...common}>
-          <rect x="4" y="4" width="9" height="9" rx="1.5" />
-          <rect x="11" y="11" width="9" height="9" rx="1.5" />
+          <rect x="3.5" y="7" width="17" height="11" rx="1.4" />
         </svg>
       );
     case 'frame':
@@ -796,17 +1309,18 @@ function Icon({ name, size = 22 }) {
     case 'table':
       return (
         <svg {...common}>
-          <rect x="4" y="4" width="16" height="16" rx="1.5" />
-          <path d="M4 10h16M4 15h16M10 4v16M15 4v16" />
+          <rect x="3.5" y="3.5" width="17" height="17" rx="1.5" />
+          <path d="M3.5 8h17M3.5 12h17M3.5 16h17" />
+          <path d="M8 3.5v17M12 3.5v17M16 3.5v17" />
         </svg>
       );
     case 'chart':
       return (
         <svg {...common}>
-          <path d="M5 19V9" />
-          <path d="M12 19V5" />
-          <path d="M19 19v-7" />
-          <path d="M3 19h18" />
+          <path d="M4 20h16" />
+          <rect x="5" y="11" width="2.8" height="9" rx="0.6" />
+          <rect x="10" y="7" width="2.8" height="13" rx="0.6" />
+          <rect x="15" y="4" width="2.8" height="16" rx="0.6" />
         </svg>
       );
     case 'play':
@@ -904,7 +1418,31 @@ function Icon({ name, size = 22 }) {
   }
 }
 
-function ChartGraphic() {
+function ChartGraphic({ chart }) {
+  const config = normalizeChartConfig(chart);
+  const values = config.values;
+  const minValue = Math.min(...values, 0);
+  const maxValue = Math.max(...values, 1);
+  const range = Math.max(maxValue - minValue, 1);
+  const yZero = 146 - (((0 - minValue) / range) * 112);
+  const slotWidth = 306 / Math.max(values.length, 1);
+  const barWidth = Math.min(48, slotWidth * 0.7);
+
+  const points = values.map((value, index) => {
+    const x = 28 + (index + 0.5) * slotWidth;
+    const yValue = 146 - (((value - minValue) / range) * 112);
+    const y = Math.min(yValue, yZero);
+    const height = Math.max(Math.abs(yValue - yZero), 1);
+
+    return {
+      x,
+      y,
+      height,
+      label: config.labels[index],
+      value,
+    };
+  });
+
   return (
     <svg className="slide-editor__chart-svg" viewBox="0 0 360 180" aria-hidden="true">
       <path d="M28 20v132h306" className="slide-editor__chart-axis" />
@@ -915,41 +1453,78 @@ function ChartGraphic() {
           className="slide-editor__chart-grid-line"
         />
       ))}
-      <polyline
-        points="42,130 88,108 134,78 180,96 226,44 272,66 318,34"
-        className="slide-editor__chart-line slide-editor__chart-line--blue"
-      />
-      <polyline
-        points="42,142 88,126 134,104 180,118 226,74 272,92 318,58"
-        className="slide-editor__chart-line slide-editor__chart-line--orange"
-      />
-      {[42, 88, 134, 180, 226, 272, 318].map((x, index) => (
-        <circle
-          key={`blue-${x}`}
-          cx={x}
-          cy={[130, 108, 78, 96, 44, 66, 34][index]}
-          r="4"
-          className="slide-editor__chart-dot slide-editor__chart-dot--blue"
+      {points.map((point) => (
+        <rect
+          key={`bar-${point.x}-${point.value}`}
+          x={point.x - barWidth / 2}
+          y={point.y}
+          width={barWidth}
+          height={point.height}
+          className="slide-editor__chart-bar slide-editor__chart-bar--blue"
         />
       ))}
-      {[42, 88, 134, 180, 226, 272, 318].map((x, index) => (
-        <circle
-          key={`orange-${x}`}
-          cx={x}
-          cy={[142, 126, 104, 118, 74, 92, 58][index]}
-          r="4"
-          className="slide-editor__chart-dot slide-editor__chart-dot--orange"
-        />
+      {points.map((point) => (
+        <text
+          key={`value-${point.x}-${point.value}`}
+          x={point.x}
+          y={point.y - 6}
+          textAnchor="middle"
+          className="slide-editor__chart-value"
+        >
+          {point.value}
+        </text>
+      ))}
+      {points.map((point, index) => (
+        <text
+          key={`label-${point.x}-${point.label}`}
+          x={point.x}
+          y="170"
+          textAnchor="middle"
+          className="slide-editor__chart-label"
+        >
+          {index < 8 ? point.label : ''}
+        </text>
       ))}
     </svg>
   );
 }
 
-function TableGraphic() {
+function TableGraphic({
+  isEditable = false,
+  onCellChange = () => {},
+  table,
+}) {
+  const config = normalizeTableConfig(table);
+
   return (
-    <div className="slide-editor__table-graphic" aria-hidden="true">
-      {Array.from({ length: 12 }, (_, index) => (
-        <span key={index} />
+    <div
+      className="slide-editor__table-graphic"
+      style={{ gridTemplateColumns: `repeat(${config.columns}, 1fr)` }}
+      aria-hidden={isEditable ? undefined : 'true'}
+    >
+      {config.cells.map((cell, index) => (
+        <span
+          key={index}
+          contentEditable={isEditable}
+          data-editable-table-cell={isEditable ? 'true' : undefined}
+          suppressContentEditableWarning
+          style={{
+            background: index < config.columns ? '#dbeafe' : '#eff6ff',
+            borderRight: (index + 1) % config.columns === 0 ? 'none' : '1px solid #bfdbfe',
+            borderBottom: index >= config.cells.length - config.columns ? 'none' : '1px solid #bfdbfe',
+          }}
+          onInput={(event) => onCellChange(index, event.currentTarget.textContent ?? '')}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
+          onPointerDown={(event) => {
+            if (isEditable) {
+              event.stopPropagation();
+            }
+          }}
+        >
+          {cell}
+        </span>
       ))}
     </div>
   );
@@ -960,6 +1535,8 @@ function SlideElement({
   isSelected,
   onDelete,
   onDragStart,
+  onResizeStart,
+  onTableCellChange,
   onSelect,
   onTextChange,
   readOnly = false,
@@ -974,21 +1551,33 @@ function SlideElement({
 
   const textStyle = {
     color: element.style?.color,
+    fontFamily: element.style?.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY,
     fontSize: `${element.style?.fontSize ?? 18}px`,
     fontStyle: element.style?.italic ? 'italic' : 'normal',
     fontWeight: element.style?.bold ? 800 : 500,
+    alignItems: element.style?.verticalAlign === 'top' ? 'flex-start' : 'center',
     justifyContent:
       element.style?.align === 'center'
         ? 'center'
         : element.style?.align === 'right'
           ? 'flex-end'
           : 'flex-start',
+    lineHeight: element.style?.lineHeight ?? 1.12,
     textAlign: element.style?.align ?? 'left',
-    textDecoration: element.style?.underline ? 'underline' : 'none',
+    textDecoration: element.linkUrl || element.style?.underline ? 'underline' : 'none',
+    textDecorationColor: element.style?.underlineColor ?? element.style?.color,
   };
 
   function handleKeyDown(event) {
     if (readOnly) return;
+
+    const isEditingText = event.target instanceof HTMLElement
+      && (
+        event.target.closest('[data-editable-text="true"]')
+        || event.target.closest('[data-editable-table-cell="true"]')
+      );
+
+    if (isEditingText) return;
 
     if ((event.key === 'Delete' || event.key === 'Backspace') && isSelected) {
       event.preventDefault();
@@ -1027,7 +1616,19 @@ function SlideElement({
         onDragStart(event, element);
       }}
     >
-      {element.type === 'text' && (
+      {element.type === 'text' && element.linkUrl && readOnly && (
+        <a
+          className="slide-editor__element-text slide-editor__element-text--link"
+          href={element.linkUrl}
+          rel="noreferrer"
+          target="_blank"
+          style={textStyle}
+        >
+          {element.text}
+        </a>
+      )}
+
+      {element.type === 'text' && !(element.linkUrl && readOnly) && (
         <div
           ref={textRef}
           className="slide-editor__element-text"
@@ -1036,6 +1637,9 @@ function SlideElement({
           suppressContentEditableWarning
           style={textStyle}
           onInput={(event) => onTextChange(element.id, event.currentTarget.textContent ?? '')}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
           onPointerDown={(event) => {
             if (!readOnly && isSelected) {
               event.stopPropagation();
@@ -1075,23 +1679,34 @@ function SlideElement({
       {element.type === 'chart' && (
         <div className="slide-editor__chart">
           <strong>{element.text}</strong>
-          <ChartGraphic />
+          <ChartGraphic chart={element.chart} />
         </div>
       )}
 
       {element.type === 'table' && (
         <div className="slide-editor__table">
           <strong>{element.text}</strong>
-          <TableGraphic />
+          <TableGraphic
+            isEditable={!readOnly && isSelected}
+            table={element.table}
+            onCellChange={(cellIndex, cellValue) => onTableCellChange(element.id, cellIndex, cellValue)}
+          />
         </div>
       )}
 
       {isSelected && !readOnly && (
         <>
-          <span className="slide-editor__resize-handle slide-editor__resize-handle--nw" />
-          <span className="slide-editor__resize-handle slide-editor__resize-handle--ne" />
-          <span className="slide-editor__resize-handle slide-editor__resize-handle--sw" />
-          <span className="slide-editor__resize-handle slide-editor__resize-handle--se" />
+          {['nw', 'ne', 'sw', 'se'].map((corner) => (
+            <span
+              key={corner}
+              className={`slide-editor__resize-handle slide-editor__resize-handle--${corner}`}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onResizeStart(event, element, corner);
+              }}
+            />
+          ))}
         </>
       )}
     </div>
@@ -1103,6 +1718,8 @@ function SlideSurface({
   onCanvasClick,
   onDelete,
   onDragStart,
+  onResizeStart,
+  onTableCellChange,
   onSelect,
   onTextChange,
   selectedElementId,
@@ -1120,6 +1737,8 @@ function SlideSurface({
           isSelected={element.id === selectedElementId}
           onDelete={onDelete}
           onDragStart={onDragStart}
+          onResizeStart={onResizeStart}
+          onTableCellChange={onTableCellChange}
           onSelect={onSelect}
           onTextChange={onTextChange}
           readOnly={readOnly}
@@ -1149,6 +1768,7 @@ function MiniSlideElement({ element }) {
           className="slide-editor__mini-text"
           style={{
             color: element.style?.color,
+            fontFamily: element.style?.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY,
             fontSize: `${miniFontSize}px`,
             fontStyle: element.style?.italic ? 'italic' : 'normal',
             fontWeight: element.style?.bold ? 900 : 700,
@@ -1184,23 +1804,25 @@ function MiniSlideElement({ element }) {
 
   if (element.type === 'chart') {
     return (
-      <span
+      <div
         className="slide-editor__mini-element slide-editor__mini-element--chart"
         style={elementStyle}
       >
-        <span />
-      </span>
+        <strong>{element.text}</strong>
+        <ChartGraphic chart={element.chart} />
+      </div>
     );
   }
 
   if (element.type === 'table') {
     return (
-      <span
+      <div
         className="slide-editor__mini-element slide-editor__mini-element--table"
         style={elementStyle}
       >
-        {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
-      </span>
+        <strong>{element.text}</strong>
+        <TableGraphic table={element.table} />
+      </div>
     );
   }
 
@@ -1237,6 +1859,9 @@ export default function SlideEditor({
   const { language, t } = useLanguage();
   const copy = useMemo(() => getEditorCopy(language), [language]);
   const canvasRef = useRef(null);
+  const imageFileInputRef = useRef(null);
+  const textColorInputRef = useRef(null);
+  const underlineColorInputRef = useRef(null);
   const initialEditorSlides = useMemo(
     () => (initialDeck ? buildEditableSlides(initialDeck.slides, initialDeck.template, copy) : []),
     [copy, initialDeck],
@@ -1251,6 +1876,8 @@ export default function SlideEditor({
   const [selectedTool, setSelectedTool] = useState('text');
   const [activePanel, setActivePanel] = useState('ai');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiError, setAiError] = useState('');
+  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
   const [imageQuery, setImageQuery] = useState('');
   const [imageResults, setImageResults] = useState([]);
   const [imageSearchError, setImageSearchError] = useState('');
@@ -1264,18 +1891,46 @@ export default function SlideEditor({
   const [saveError, setSaveError] = useState('');
   const [isSavingDeck, setIsSavingDeck] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewSlideId, setPreviewSlideId] = useState('');
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [shareAccess, setShareAccess] = useState(() => getShareAccessFromTemplate(initialDeck?.template));
   const [isUpdatingShareAccess, setIsUpdatingShareAccess] = useState(false);
   const [shareInviteEmail, setShareInviteEmail] = useState('');
   const [shareInvitees, setShareInvitees] = useState([]);
+  const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
+  const [tableDialogData, setTableDialogData] = useState({
+    columns: String(DEFAULT_TABLE_COLUMNS),
+    rows: String(DEFAULT_TABLE_ROWS),
+  });
+  const [tableDialogError, setTableDialogError] = useState('');
+  const [isChartDialogOpen, setIsChartDialogOpen] = useState(false);
+  const [chartDialogData, setChartDialogData] = useState({
+    labels: copy.chartLabelsPlaceholder,
+    title: copy.chartLabel,
+    values: copy.chartValuesPlaceholder,
+  });
+  const [chartDialogError, setChartDialogError] = useState('');
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [linkUrlDraft, setLinkUrlDraft] = useState('');
+  const [linkDialogError, setLinkDialogError] = useState('');
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState([]);
   const [dragState, setDragState] = useState(null);
+  const [draggedSlideIndex, setDraggedSlideIndex] = useState(null);
   const canLoadDeck = Boolean(!initialDeck && templateId && currentUserId);
   const missingLoadInput = Boolean(!initialDeck && (!templateId || !currentUserId));
   const isLoading = canLoadDeck && !deck && !error;
   const activeEditorSlide = editorSlides.find((slide) => slide.id === activeSlideId)
     ?? editorSlides[0]
     ?? null;
+  const previewSlide = editorSlides.find((slide) => slide.id === previewSlideId)
+    ?? activeEditorSlide
+    ?? editorSlides[0]
+    ?? null;
+  const previewSlideIndex = Math.max(
+    editorSlides.findIndex((slide) => slide.id === previewSlide?.id),
+    0,
+  );
   const selectedElement = activeEditorSlide?.elements.find(
     (element) => element.id === selectedElementId,
   ) ?? null;
@@ -1300,6 +1955,31 @@ export default function SlideEditor({
             style: {
               ...element.style,
               ...(patch.style ?? {}),
+            },
+          };
+        }),
+      };
+    }));
+  }, [activeSlideId]);
+
+  const updateTableCell = useCallback((elementId, cellIndex, cellValue) => {
+    setEditorSlides((currentSlides) => currentSlides.map((slide) => {
+      if (slide.id !== activeSlideId) return slide;
+
+      return {
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (element.id !== elementId || element.type !== 'table') return element;
+
+          const table = normalizeTableConfig(element.table);
+          const cells = [...table.cells];
+          cells[cellIndex] = cellValue;
+
+          return {
+            ...element,
+            table: {
+              ...table,
+              cells,
             },
           };
         }),
@@ -1365,6 +2045,40 @@ export default function SlideEditor({
   }, [toast]);
 
   useEffect(() => {
+    if (!isPreviewOpen) return undefined;
+
+    function moveByDirection(direction) {
+      setPreviewSlideId((currentId) => {
+        const currentIndex = editorSlides.findIndex((slide) => slide.id === currentId);
+        const safeIndex = currentIndex < 0 ? previewSlideIndex : currentIndex;
+        const nextIndex = clamp(safeIndex + direction, 0, editorSlides.length - 1);
+
+        return editorSlides[nextIndex]?.id ?? currentId;
+      });
+    }
+
+    function handlePreviewKeyDown(event) {
+      if (event.key === 'ArrowRight' || event.key === ' ') {
+        event.preventDefault();
+        moveByDirection(1);
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        moveByDirection(-1);
+      }
+
+      if (event.key === 'Escape') {
+        setIsPreviewOpen(false);
+      }
+    }
+
+    window.addEventListener('keydown', handlePreviewKeyDown);
+
+    return () => window.removeEventListener('keydown', handlePreviewKeyDown);
+  }, [editorSlides, isPreviewOpen, previewSlideIndex]);
+
+  useEffect(() => {
     if (!dragState) return undefined;
 
     function handlePointerMove(event) {
@@ -1374,6 +2088,44 @@ export default function SlideEditor({
 
       const dx = ((event.clientX - dragState.startClientX) / rect.width) * 100;
       const dy = ((event.clientY - dragState.startClientY) / rect.height) * 100;
+
+      if (dragState.mode === 'resize') {
+        const minWidth = 4;
+        const minHeight = 4;
+        const maxRight = dragState.startX + dragState.startWidth;
+        const maxBottom = dragState.startY + dragState.startHeight;
+        let nextX = dragState.startX;
+        let nextY = dragState.startY;
+        let nextWidth = dragState.startWidth;
+        let nextHeight = dragState.startHeight;
+
+        if (dragState.corner.includes('e')) {
+          nextWidth = clamp(dragState.startWidth + dx, minWidth, 100 - dragState.startX);
+        }
+
+        if (dragState.corner.includes('s')) {
+          nextHeight = clamp(dragState.startHeight + dy, minHeight, 100 - dragState.startY);
+        }
+
+        if (dragState.corner.includes('w')) {
+          nextX = clamp(dragState.startX + dx, 0, maxRight - minWidth);
+          nextWidth = clamp(maxRight - nextX, minWidth, 100 - nextX);
+        }
+
+        if (dragState.corner.includes('n')) {
+          nextY = clamp(dragState.startY + dy, 0, maxBottom - minHeight);
+          nextHeight = clamp(maxBottom - nextY, minHeight, 100 - nextY);
+        }
+
+        updateElement(dragState.elementId, {
+          height: Number(nextHeight.toFixed(2)),
+          width: Number(nextWidth.toFixed(2)),
+          x: Number(nextX.toFixed(2)),
+          y: Number(nextY.toFixed(2)),
+        });
+        return;
+      }
+
       const nextX = clamp(dragState.startX + dx, 0, 100 - dragState.width);
       const nextY = clamp(dragState.startY + dy, 0, 100 - dragState.height);
 
@@ -1413,6 +2165,150 @@ export default function SlideEditor({
     }));
   }
 
+  function insertImageIntoSelectionOrAdd(imagePatch) {
+    if (selectedElement?.type === 'image') {
+      updateElement(selectedElement.id, {
+        ...imagePatch,
+        fill: imagePatch.fill ?? selectedElement.fill ?? '#ffffff',
+      });
+      setSelectedTool('image');
+      setSelectedElementId(selectedElement.id);
+      return;
+    }
+
+    addElement('image', imagePatch);
+  }
+
+  function copySelectedElement() {
+    if (!selectedElement || !activeEditorSlide) {
+      setToast(copy.noSelection);
+      return;
+    }
+
+    const duplicatedElement = cloneEditorElement(selectedElement);
+
+    setSelectedTool('copy');
+    setSelectedElementId(duplicatedElement.id);
+    setEditorSlides((currentSlides) => currentSlides.map((slide) => {
+      if (slide.id !== activeEditorSlide.id) return slide;
+
+      return {
+        ...slide,
+        elements: [...slide.elements, duplicatedElement],
+      };
+    }));
+    setToast(copy.copiedSelection);
+  }
+
+  function handleToolbarItemClick(itemId) {
+    if (itemId === 'copy') {
+      copySelectedElement();
+      return;
+    }
+
+    if (itemId === 'image') {
+      imageFileInputRef.current?.click();
+      setSelectedTool('image');
+      return;
+    }
+
+    if (itemId === 'table') {
+      setTableDialogData({
+        columns: String(DEFAULT_TABLE_COLUMNS),
+        rows: String(DEFAULT_TABLE_ROWS),
+      });
+      setTableDialogError('');
+      setIsTableDialogOpen(true);
+      setSelectedTool('table');
+      return;
+    }
+
+    if (itemId === 'chart') {
+      setChartDialogData({
+        labels: copy.chartLabelsPlaceholder,
+        title: copy.chartLabel,
+        values: copy.chartValuesPlaceholder,
+      });
+      setChartDialogError('');
+      setIsChartDialogOpen(true);
+      setSelectedTool('chart');
+      return;
+    }
+
+    addElement(itemId);
+  }
+
+  function handleImageFileChange(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setToast(copy.invalidImageFile);
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.addEventListener('load', () => {
+      insertImageIntoSelectionOrAdd({
+        alt: file.name,
+        fill: '#ffffff',
+        sourceUrl: null,
+        src: String(reader.result ?? ''),
+        text: file.name,
+      });
+    });
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  }
+
+  function handleTableDialogSubmit(event) {
+    event.preventDefault();
+
+    const rows = Number(tableDialogData.rows);
+    const columns = Number(tableDialogData.columns);
+
+    if (
+      !Number.isInteger(rows)
+      || !Number.isInteger(columns)
+      || rows < MIN_TABLE_SIZE
+      || rows > MAX_TABLE_SIZE
+      || columns < MIN_TABLE_SIZE
+      || columns > MAX_TABLE_SIZE
+    ) {
+      setTableDialogError(copy.tableSizeError);
+      return;
+    }
+
+    addElement('table', {
+      table: normalizeTableConfig({ columns, rows }),
+    });
+    setIsTableDialogOpen(false);
+  }
+
+  function handleChartDialogSubmit(event) {
+    event.preventDefault();
+
+    const values = parseNumberList(chartDialogData.values);
+
+    if (!values.length) {
+      setChartDialogError(copy.chartValuesError);
+      return;
+    }
+
+    addElement('chart', {
+      chart: normalizeChartConfig({
+        labels: parseLabelList(chartDialogData.labels, values.length),
+        title: chartDialogData.title.trim() || copy.chartLabel,
+        values,
+      }, copy),
+      text: chartDialogData.title.trim() || copy.chartLabel,
+    });
+    setIsChartDialogOpen(false);
+  }
+
   function applyLayout(layoutId) {
     if (!activeEditorSlide) return;
 
@@ -1435,6 +2331,7 @@ export default function SlideEditor({
     setDragState({
       elementId: element.id,
       height: element.height,
+      mode: 'move',
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: element.x,
@@ -1443,10 +2340,61 @@ export default function SlideEditor({
     });
   }
 
+  function handleResizeStart(event, element, corner) {
+    setDragState({
+      corner,
+      elementId: element.id,
+      mode: 'resize',
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startHeight: element.height,
+      startWidth: element.width,
+      startX: element.x,
+      startY: element.y,
+    });
+  }
+
   function updateSelectedTextStyle(stylePatch) {
     if (!selectedElement) return;
 
     updateElement(selectedElement.id, { style: stylePatch });
+  }
+
+  function keepTextCaretOnToolbarMouseDown(event) {
+    event.preventDefault();
+  }
+
+  function openLinkDialog() {
+    if (!isSelectedText) {
+      setToast(copy.noSelection);
+      return;
+    }
+
+    setLinkUrlDraft(selectedElement?.linkUrl ?? '');
+    setLinkDialogError('');
+    setIsLinkDialogOpen(true);
+  }
+
+  function handleLinkSubmit(event) {
+    event.preventDefault();
+
+    const normalizedUrl = normalizeLinkUrl(linkUrlDraft);
+
+    if (!normalizedUrl) {
+      setLinkDialogError(copy.invalidLink);
+      return;
+    }
+
+    updateElement(selectedElement.id, { linkUrl: normalizedUrl });
+    setIsLinkDialogOpen(false);
+  }
+
+  function removeSelectedLink() {
+    if (!selectedElement) return;
+
+    updateElement(selectedElement.id, { linkUrl: '' });
+    setLinkUrlDraft('');
+    setIsLinkDialogOpen(false);
   }
 
   function getShareUrl() {
@@ -1533,9 +2481,27 @@ export default function SlideEditor({
   }
 
   function handleQuizClick() {
-    setActivePanel('ai');
-    setAiPrompt(copy.quizPrompt);
-    setToast(copy.quizPrompt);
+    const questions = buildQuizQuestions(activeEditorSlide, deckTitleDraft || copy.defaultTitle, copy);
+
+    setQuizQuestions(questions);
+    setIsQuizOpen(true);
+  }
+
+  function openPreview() {
+    setPreviewSlideId(activeEditorSlide?.id ?? editorSlides[0]?.id ?? '');
+    setIsPreviewOpen(true);
+  }
+
+  function movePreviewSlide(direction) {
+    if (!editorSlides.length) return;
+
+    setPreviewSlideId((currentId) => {
+      const currentIndex = editorSlides.findIndex((slide) => slide.id === currentId);
+      const safeIndex = currentIndex < 0 ? previewSlideIndex : currentIndex;
+      const nextIndex = clamp(safeIndex + direction, 0, editorSlides.length - 1);
+
+      return editorSlides[nextIndex]?.id ?? currentId;
+    });
   }
 
   function handleSidebarTabClick(panelId) {
@@ -1547,6 +2513,33 @@ export default function SlideEditor({
       event.preventDefault();
       event.currentTarget.blur();
     }
+  }
+
+  function handleSlideDragStart(event, index) {
+    setDraggedSlideIndex(index);
+    event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleSlideDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleSlideDrop(event, targetIndex) {
+    event.preventDefault();
+    if (draggedSlideIndex === null || draggedSlideIndex === targetIndex) return;
+
+    setEditorSlides((currentSlides) => {
+      const nextSlides = [...currentSlides];
+      const [draggedSlide] = nextSlides.splice(draggedSlideIndex, 1);
+      nextSlides.splice(targetIndex, 0, draggedSlide);
+      return nextSlides.map((slide, i) => ({ ...slide, position: i + 1 }));
+    });
+    setDraggedSlideIndex(null);
+  }
+
+  function handleSlideDragEnd() {
+    setDraggedSlideIndex(null);
   }
 
   async function handleImageSearch(event) {
@@ -1571,6 +2564,57 @@ export default function SlideEditor({
       setToast(copy.imageSearchRendered);
     } finally {
       setIsImageSearching(false);
+    }
+  }
+
+  async function handleAiGenerateDraft() {
+    const prompt = aiPrompt.trim();
+
+    if (!prompt) {
+      setAiError(copy.aiGenerateError
+        ? formatCopy(copy.aiGenerateError, { message: copy.aiPrompt })
+        : copy.aiPrompt);
+      return;
+    }
+
+    setAiError('');
+    setIsGeneratingAiDraft(true);
+
+    try {
+      const generatedDeck = await generateSlideDraftWithGemini({
+        deckTitle: deckTitleDraft,
+        prompt,
+      });
+      const generatedSlides = buildAiDraftSlides(generatedDeck, copy);
+      const firstSlide = generatedSlides[0];
+      const firstTextElement = firstSlide?.elements.find((element) => element.type === 'text');
+
+      setEditorSlides((currentSlides) => {
+        const activeIndex = currentSlides.findIndex((slide) => slide.id === activeSlideId);
+        const insertIndex = activeIndex >= 0 ? activeIndex + 1 : currentSlides.length;
+        const nextSlides = [
+          ...currentSlides.slice(0, insertIndex),
+          ...generatedSlides,
+          ...currentSlides.slice(insertIndex),
+        ];
+
+        return nextSlides.map((slide, index) => ({
+          ...slide,
+          position: index + 1,
+        }));
+      });
+      setActiveSlideId(firstSlide?.id ?? activeSlideId);
+      setSelectedElementId(firstTextElement?.id ?? firstSlide?.elements[0]?.id ?? '');
+      setDeckTitleDraft((currentTitle) => currentTitle || generatedDeck.deckTitle || copy.defaultTitle);
+      setAiPrompt('');
+      setToast(copy.aiGenerated ?? 'AI draft generated');
+    } catch (generateError) {
+      setAiError(formatCopy(
+        copy.aiGenerateError ?? 'Could not generate AI draft: {{message}}',
+        { message: generateError.message },
+      ));
+    } finally {
+      setIsGeneratingAiDraft(false);
     }
   }
 
@@ -1739,12 +2783,20 @@ export default function SlideEditor({
                 className={`slide-editor__tool${selectedTool === item.id ? ' slide-editor__tool--active' : ''}`}
                 title={copy[item.copyKey]}
                 aria-label={copy[item.copyKey]}
-                onClick={() => addElement(item.id === 'frame' ? 'frame' : item.id)}
+                onClick={() => handleToolbarItemClick(item.id)}
               >
-                <Icon name={item.icon} />
+                <Icon name={item.icon} size={30} />
               </button>
             ))}
           </div>
+          <input
+            ref={imageFileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml"
+            className="slide-editor__hidden-input"
+            aria-label={copy.uploadImageLabel}
+            onChange={handleImageFileChange}
+          />
 
           <input
             type="text"
@@ -1782,7 +2834,7 @@ export default function SlideEditor({
               <small>{copy.deleteSlideSubLabel}</small>
             </span>
           </button>
-          <button type="button" onClick={() => setIsPreviewOpen(true)}>
+          <button type="button" onClick={openPreview}>
             <Icon name="play" size={20} />
             <span>
               <strong>{t('editor.present')}</strong>
@@ -1818,18 +2870,28 @@ export default function SlideEditor({
               className="slide-editor__floating-tool"
               title={copy.colorLabel}
               disabled={!isSelectedText}
-              onClick={() => updateSelectedTextStyle({ color: selectedElement?.style?.color === '#111827' ? '#2563eb' : '#111827' })}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
+              onClick={() => textColorInputRef.current?.click()}
             >
               <Icon name="type" size={18} />
             </button>
+            <input
+              ref={textColorInputRef}
+              type="color"
+              className="slide-editor__hidden-input"
+              value={selectedElement?.style?.color ?? '#111827'}
+              onChange={(event) => updateSelectedTextStyle({ color: event.target.value })}
+            />
 
             <select
               aria-label={copy.fontFamily}
               disabled={!isSelectedText}
-              value={copy.fontFamily}
-              onChange={() => {}}
+              value={selectedElement?.style?.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY}
+              onChange={(event) => updateSelectedTextStyle({ fontFamily: event.target.value })}
             >
-              <option>{copy.fontFamily}</option>
+              {TEXT_FONT_FAMILIES.map((font) => (
+                <option key={font.value} value={font.value}>{font.label}</option>
+              ))}
             </select>
 
             <select
@@ -1847,6 +2909,8 @@ export default function SlideEditor({
               type="button"
               className={`slide-editor__floating-tool${selectedElement?.style?.bold ? ' slide-editor__floating-tool--active' : ''}`}
               disabled={!isSelectedText}
+              aria-pressed={Boolean(selectedElement?.style?.bold)}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
               onClick={() => updateSelectedTextStyle({ bold: !selectedElement?.style?.bold })}
             >
               B
@@ -1855,6 +2919,8 @@ export default function SlideEditor({
               type="button"
               className={`slide-editor__floating-tool${selectedElement?.style?.italic ? ' slide-editor__floating-tool--active' : ''}`}
               disabled={!isSelectedText}
+              aria-pressed={Boolean(selectedElement?.style?.italic)}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
               onClick={() => updateSelectedTextStyle({ italic: !selectedElement?.style?.italic })}
             >
               <em>I</em>
@@ -1863,9 +2929,38 @@ export default function SlideEditor({
               type="button"
               className={`slide-editor__floating-tool${selectedElement?.style?.underline ? ' slide-editor__floating-tool--active' : ''}`}
               disabled={!isSelectedText}
+              aria-pressed={Boolean(selectedElement?.style?.underline)}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
               onClick={() => updateSelectedTextStyle({ underline: !selectedElement?.style?.underline })}
             >
               <span className="slide-editor__underline">U</span>
+            </button>
+            <button
+              type="button"
+              className="slide-editor__floating-tool"
+              title={copy.underlineColorLabel}
+              disabled={!isSelectedText}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
+              onClick={() => underlineColorInputRef.current?.click()}
+            >
+              <span className="slide-editor__underline">A</span>
+            </button>
+            <input
+              ref={underlineColorInputRef}
+              type="color"
+              className="slide-editor__hidden-input"
+              value={selectedElement?.style?.underlineColor ?? selectedElement?.style?.color ?? '#111827'}
+              onChange={(event) => updateSelectedTextStyle({ underline: true, underlineColor: event.target.value })}
+            />
+            <button
+              type="button"
+              className={`slide-editor__floating-tool${selectedElement?.linkUrl ? ' slide-editor__floating-tool--active' : ''}`}
+              title={copy.linkLabel}
+              disabled={!isSelectedText}
+              onMouseDown={keepTextCaretOnToolbarMouseDown}
+              onClick={openLinkDialog}
+            >
+              <Icon name="link" size={18} />
             </button>
 
             {['left', 'center', 'right'].map((align) => (
@@ -1874,6 +2969,8 @@ export default function SlideEditor({
                 type="button"
                 className={`slide-editor__align-btn slide-editor__align-btn--${align}${selectedElement?.style?.align === align ? ' slide-editor__floating-tool--active' : ''}`}
                 disabled={!isSelectedText}
+                aria-pressed={selectedElement?.style?.align === align}
+                onMouseDown={keepTextCaretOnToolbarMouseDown}
                 onClick={() => updateSelectedTextStyle({ align })}
                 aria-label={align}
               >
@@ -1890,7 +2987,9 @@ export default function SlideEditor({
               onCanvasClick={() => setSelectedElementId('')}
               onDelete={deleteSelectedElement}
               onDragStart={handleDragStart}
+              onResizeStart={handleResizeStart}
               onSelect={setSelectedElementId}
+              onTableCellChange={updateTableCell}
               onTextChange={(elementId, text) => updateElement(elementId, { text })}
               selectedElementId={selectedElementId}
             />
@@ -1898,7 +2997,15 @@ export default function SlideEditor({
 
           <div className="slide-editor__thumbnails" aria-label={t('editor.thumbnailAria')}>
             {editorSlides.map((slide, index) => (
-              <div key={slide.id} className="slide-editor__thumb-wrap">
+              <div
+                key={slide.id}
+                className={`slide-editor__thumb-wrap${draggedSlideIndex === index ? ' slide-editor__thumb-wrap--dragging' : ''}`}
+                draggable
+                onDragStart={(event) => handleSlideDragStart(event, index)}
+                onDragOver={handleSlideDragOver}
+                onDrop={(event) => handleSlideDrop(event, index)}
+                onDragEnd={handleSlideDragEnd}
+              >
                 <button
                   type="button"
                   className={`slide-editor__thumb${slide.id === activeEditorSlide?.id ? ' slide-editor__thumb--active' : ''}`}
@@ -1958,24 +3065,20 @@ export default function SlideEditor({
                   <textarea
                     value={aiPrompt}
                     placeholder={copy.aiPrompt}
+                    disabled={isGeneratingAiDraft}
                     onChange={(event) => setAiPrompt(event.target.value)}
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      addElement('text', {
-                        x: 14,
-                        y: 34,
-                        width: 72,
-                        height: 16,
-                        text: aiPrompt.trim() || copy.sampleText,
-                      });
-                      setAiPrompt('');
-                    }}
+                    disabled={isGeneratingAiDraft}
+                    onClick={handleAiGenerateDraft}
                   >
-                    {copy.generateText}
+                    {isGeneratingAiDraft ? copy.aiGenerating : copy.generateText}
                   </button>
                 </div>
+                {aiError && (
+                  <p className="slide-editor__ai-error" role="alert">{aiError}</p>
+                )}
               </section>
             )}
 
@@ -2016,7 +3119,7 @@ export default function SlideEditor({
                       style={{ backgroundColor: tile.color }}
                       title={tile.label}
                       aria-label={tile.label}
-                      onClick={() => addElement('image', {
+                      onClick={() => insertImageIntoSelectionOrAdd({
                         text: tile.label,
                         fill: tile.color,
                         src: tile.src,
@@ -2048,7 +3151,7 @@ export default function SlideEditor({
                       onClick={() => applyLayout(layout.id)}
                     >
                       <span className={`slide-editor__layout-preview slide-editor__layout-preview--${layout.id}`} />
-                      <strong>{copy[layout.copyKey]}</strong>
+                      <strong>{layout.copyKey ? copy[layout.copyKey] : layout.labels?.[language]}</strong>
                     </button>
                   ))}
                 </div>
@@ -2092,6 +3195,138 @@ export default function SlideEditor({
               <Icon name="save" size={18} />
               {isSavingDeck ? copy.savingLabel : copy.saveLabel}
             </button>
+          </form>
+        </div>
+      )}
+
+      {isTableDialogOpen && (
+        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.tableDialogTitle}>
+          <form className="slide-editor__save-dialog slide-editor__tool-dialog" onSubmit={handleTableDialogSubmit}>
+            <div className="slide-editor__modal-header">
+              <strong>{copy.tableDialogTitle}</strong>
+              <button type="button" onClick={() => setIsTableDialogOpen(false)}>
+                {copy.saveCancel}
+              </button>
+            </div>
+            <div className="slide-editor__dialog-grid">
+              <label className="slide-editor__save-field">
+                <span>{copy.rowLabel}</span>
+                <input
+                  type="number"
+                  min={MIN_TABLE_SIZE}
+                  max={MAX_TABLE_SIZE}
+                  value={tableDialogData.rows}
+                  onChange={(event) => setTableDialogData((current) => ({
+                    ...current,
+                    rows: event.target.value,
+                  }))}
+                />
+              </label>
+              <label className="slide-editor__save-field">
+                <span>{copy.columnLabel}</span>
+                <input
+                  type="number"
+                  min={MIN_TABLE_SIZE}
+                  max={MAX_TABLE_SIZE}
+                  value={tableDialogData.columns}
+                  onChange={(event) => setTableDialogData((current) => ({
+                    ...current,
+                    columns: event.target.value,
+                  }))}
+                />
+              </label>
+            </div>
+            {tableDialogError && <p className="slide-editor__save-error">{tableDialogError}</p>}
+            <button type="submit" className="slide-editor__save-submit">
+              <Icon name="table" size={18} />
+              {copy.insertTable}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {isChartDialogOpen && (
+        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.chartDialogTitle}>
+          <form className="slide-editor__save-dialog slide-editor__tool-dialog" onSubmit={handleChartDialogSubmit}>
+            <div className="slide-editor__modal-header">
+              <strong>{copy.chartDialogTitle}</strong>
+              <button type="button" onClick={() => setIsChartDialogOpen(false)}>
+                {copy.saveCancel}
+              </button>
+            </div>
+            <label className="slide-editor__save-field">
+              <span>{copy.chartTitleLabel}</span>
+              <input
+                type="text"
+                value={chartDialogData.title}
+                onChange={(event) => setChartDialogData((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))}
+              />
+            </label>
+            <label className="slide-editor__save-field">
+              <span>{copy.chartLabelsLabel}</span>
+              <input
+                type="text"
+                value={chartDialogData.labels}
+                placeholder={copy.chartLabelsPlaceholder}
+                onChange={(event) => setChartDialogData((current) => ({
+                  ...current,
+                  labels: event.target.value,
+                }))}
+              />
+            </label>
+            <label className="slide-editor__save-field">
+              <span>{copy.chartValuesLabel}</span>
+              <input
+                type="text"
+                value={chartDialogData.values}
+                placeholder={copy.chartValuesPlaceholder}
+                onChange={(event) => setChartDialogData((current) => ({
+                  ...current,
+                  values: event.target.value,
+                }))}
+              />
+            </label>
+            {chartDialogError && <p className="slide-editor__save-error">{chartDialogError}</p>}
+            <button type="submit" className="slide-editor__save-submit">
+              <Icon name="chart" size={18} />
+              {copy.insertChart}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {isLinkDialogOpen && (
+        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.linkDialogTitle}>
+          <form className="slide-editor__save-dialog slide-editor__tool-dialog" onSubmit={handleLinkSubmit}>
+            <div className="slide-editor__modal-header">
+              <strong>{copy.linkDialogTitle}</strong>
+              <button type="button" onClick={() => setIsLinkDialogOpen(false)}>
+                {copy.saveCancel}
+              </button>
+            </div>
+            <label className="slide-editor__save-field">
+              <span>{copy.linkUrlLabel}</span>
+              <input
+                type="url"
+                value={linkUrlDraft}
+                placeholder={copy.linkUrlPlaceholder}
+                onChange={(event) => setLinkUrlDraft(event.target.value)}
+                autoFocus
+              />
+            </label>
+            {linkDialogError && <p className="slide-editor__save-error">{linkDialogError}</p>}
+            <div className="slide-editor__dialog-actions">
+              <button type="button" className="slide-editor__secondary-submit" onClick={removeSelectedLink}>
+                {copy.removeLink}
+              </button>
+              <button type="submit" className="slide-editor__save-submit">
+                <Icon name="link" size={18} />
+                {copy.applyLink}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -2172,25 +3407,65 @@ export default function SlideEditor({
         </div>
       )}
 
+      {isQuizOpen && (
+        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.quizDialogTitle}>
+          <div className="slide-editor__quiz-dialog">
+            <div className="slide-editor__modal-header">
+              <strong>{copy.quizDialogTitle}</strong>
+              <button type="button" onClick={() => setIsQuizOpen(false)}>
+                {copy.closeQuiz}
+              </button>
+            </div>
+            <div className="slide-editor__quiz-list">
+              {quizQuestions.map((item, index) => (
+                <article key={`${item.question}-${index}`} className="slide-editor__quiz-item">
+                  <small>{copy.quizQuestionLabel} {index + 1}</small>
+                  <strong>{item.question}</strong>
+                  <span>{copy.quizAnswerLabel}: {item.answer}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPreviewOpen && (
         <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.previewTitle}>
-          <div className="slide-editor__modal-content">
+          <div className="slide-editor__modal-content slide-editor__modal-content--preview">
             <div className="slide-editor__modal-header">
-              <strong>{copy.previewTitle}</strong>
+              <strong>{copy.previewTitle} {previewSlideIndex + 1}/{editorSlides.length}</strong>
               <button type="button" onClick={() => setIsPreviewOpen(false)}>
                 {copy.closePreview}
               </button>
             </div>
             <SlideSurface
-              elements={activeEditorSlide?.elements ?? []}
+              elements={previewSlide?.elements ?? []}
               onCanvasClick={() => {}}
               onDelete={() => {}}
               onDragStart={() => {}}
+              onResizeStart={() => {}}
               onSelect={() => {}}
+              onTableCellChange={() => {}}
               onTextChange={() => {}}
               selectedElementId=""
               readOnly
             />
+            <div className="slide-editor__preview-controls">
+              <button
+                type="button"
+                onClick={() => movePreviewSlide(-1)}
+                disabled={previewSlideIndex <= 0}
+              >
+                {copy.previewPrevious}
+              </button>
+              <button
+                type="button"
+                onClick={() => movePreviewSlide(1)}
+                disabled={previewSlideIndex >= editorSlides.length - 1}
+              >
+                {copy.previewNext}
+              </button>
+            </div>
           </div>
         </div>
       )}

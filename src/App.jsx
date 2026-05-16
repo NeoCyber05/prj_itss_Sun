@@ -5,11 +5,13 @@ import RegisterForm from './components/RegisterForm';
 import Home from './components/Home';
 import MySlides from './components/MySlides';
 import SlideEditor from './components/SlideEditor';
+import TemplateDetail from './components/TemplateDetail';
 import { useLanguage } from './i18n/LanguageContext.jsx';
 import { supabase } from './supabaseClient';
-import { createBlankDeck } from './services/slideCreationService.js';
+import { createBlankDeck, recordTemplateOpened } from './services/slideCreationService.js';
 
 const EDITOR_HASH_PREFIX = '#editor=';
+const PERSISTED_TEMPLATE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getEditorTemplateIdFromHash() {
   if (!window.location.hash.startsWith(EDITOR_HASH_PREFIX)) {
@@ -29,6 +31,10 @@ function clearEditorHash() {
   }
 }
 
+function isPersistedTemplateId(value) {
+  return PERSISTED_TEMPLATE_ID_PATTERN.test(String(value ?? ''));
+}
+
 /**
  * App – Root component.
  * Manages view state (home ↔ login ↔ register).
@@ -45,8 +51,11 @@ export default function App() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [activeDeck, setActiveDeck] = useState(null);
   const [activeTemplateId, setActiveTemplateId] = useState(initialEditorTemplateId);
+  const [detailTemplate, setDetailTemplate] = useState(null);
+  const [detailReturnView, setDetailReturnView] = useState('home');
   const [isCreatingSlide, setIsCreatingSlide] = useState(false);
   const [createSlideError, setCreateSlideError] = useState('');
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -69,10 +78,18 @@ export default function App() {
           setView('home');
         }
       } else {
-        setView('home');
+        const templateId = getEditorTemplateIdFromHash();
+
+        if (templateId) {
+          setActiveTemplateId(templateId);
+          setView('login');
+        } else {
+          setView('home');
+          setActiveTemplateId('');
+        }
+
         setActiveDeck(null);
-        setActiveTemplateId('');
-        clearEditorHash();
+        setDetailTemplate(null);
       }
     }
 
@@ -98,10 +115,18 @@ export default function App() {
   }, []);
 
   function handleLoginSuccess(demoUser) {
+    const templateId = getEditorTemplateIdFromHash();
+
     setIsAuthReady(true);
     setIsLoggedIn(true);
     setUser(demoUser);
-    setView('home');
+
+    if (templateId) {
+      setActiveTemplateId(templateId);
+      setView('editor');
+    } else {
+      setView('home');
+    }
   }
 
   async function handleLogout() {
@@ -119,6 +144,7 @@ export default function App() {
     setIsSearchActive(false);
     setActiveDeck(null);
     setActiveTemplateId('');
+    setDetailTemplate(null);
     setCreateSlideError('');
     clearEditorHash();
     setView('home');
@@ -133,6 +159,7 @@ export default function App() {
       setIsSearchActive(false);
       setActiveDeck(null);
       setActiveTemplateId('');
+      setDetailTemplate(null);
       setCreateSlideError('');
       clearEditorHash();
     }
@@ -144,6 +171,7 @@ export default function App() {
     setView('home');
     setActiveDeck(null);
     setActiveTemplateId('');
+    setDetailTemplate(null);
     clearEditorHash();
     setSubmittedSearchQuery(query);
     setIsSearchActive(query.length > 0);
@@ -161,6 +189,7 @@ export default function App() {
 
     try {
       const deck = await createBlankDeck({ userId: user.id, language });
+      recordTemplateOpened({ templateId: deck.template.id, userId: user.id }).catch(() => {});
 
       setActiveDeck(deck);
       setActiveTemplateId(deck.template.id);
@@ -174,9 +203,49 @@ export default function App() {
   }
 
   function handleOpenSavedTemplate(templateId) {
+    if (user?.id && isPersistedTemplateId(templateId)) {
+      recordTemplateOpened({ templateId, userId: user.id }).catch(() => {});
+    }
+
     setActiveDeck(null);
     setActiveTemplateId(templateId);
+    setDetailTemplate(null);
     setEditorHash(templateId);
+    setView('editor');
+  }
+
+  function handleOpenTemplateDetail(template) {
+    const nextTemplate = typeof template === 'string' ? { id: template } : template;
+
+    if (user?.id && isPersistedTemplateId(nextTemplate?.id)) {
+      recordTemplateOpened({ templateId: nextTemplate.id, userId: user.id }).catch(() => {});
+    }
+
+    setActiveDeck(null);
+    setActiveTemplateId(nextTemplate?.id ?? '');
+    setDetailTemplate(nextTemplate ?? null);
+    setDetailReturnView((currentReturnView) => (view === 'template-detail' ? currentReturnView : view));
+    clearEditorHash();
+    setView('template-detail');
+  }
+
+  function handleBackFromTemplateDetail() {
+    setView(detailReturnView || 'home');
+    setActiveDeck(null);
+    setActiveTemplateId('');
+    setDetailTemplate(null);
+    clearEditorHash();
+  }
+
+  function handleCreatedDeckFromDetail(deck) {
+    if (user?.id && deck?.template?.id) {
+      recordTemplateOpened({ templateId: deck.template.id, userId: user.id }).catch(() => {});
+    }
+
+    setActiveDeck(deck);
+    setActiveTemplateId(deck.template.id);
+    setDetailTemplate(null);
+    setEditorHash(deck.template.id);
     setView('editor');
   }
 
@@ -185,6 +254,7 @@ export default function App() {
     setActiveDeck(null);
     setActiveTemplateId('');
     clearEditorHash();
+    setHomeRefreshKey((key) => key + 1);
   }
 
   return (
@@ -205,18 +275,35 @@ export default function App() {
       <main className={`main${view === 'login' || view === 'register' ? ' main--auth' : ''}`} id="mainContent">
         {view === 'home' && (
           <Home
+            currentUserId={user?.id}
             isLoggedIn={isLoggedIn}
             submittedSearchQuery={submittedSearchQuery}
             isSearchActive={isSearchActive}
             onCreateNewSlide={handleCreateNewSlide}
+            onOpenTemplate={handleOpenTemplateDetail}
+            onOpenRecentTemplate={handleOpenSavedTemplate}
             isCreatingSlide={isCreatingSlide}
             createSlideError={createSlideError}
+            refreshKey={homeRefreshKey}
           />
         )}
         {view === 'my-slides' && (
           <MySlides
             currentUserId={user?.id}
             onOpenTemplate={handleOpenSavedTemplate}
+          />
+        )}
+        {view === 'template-detail' && (
+          <TemplateDetail
+            key={detailTemplate?.id ?? activeTemplateId ?? 'template-detail'}
+            templateId={detailTemplate?.id ?? activeTemplateId}
+            initialTemplate={detailTemplate}
+            currentUserId={user?.id}
+            onBack={handleBackFromTemplateDetail}
+            onCreatedDeck={handleCreatedDeckFromDetail}
+            onEditTemplate={handleOpenSavedTemplate}
+            onOpenTemplateDetail={handleOpenTemplateDetail}
+            onRequireLogin={() => {}}
           />
         )}
         {view === 'editor' && (

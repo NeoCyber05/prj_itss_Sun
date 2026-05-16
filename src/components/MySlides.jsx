@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
 import { deleteSavedTemplate, listSavedTemplates } from '../services/slideCreationService.js';
+import SlidePreviewThumbnail from './SlidePreviewThumbnail.jsx';
 import './MySlides.css';
 
 const COPY = {
   ja: {
-    title: '私のスライド',
-    subtitle: '保存済みテンプレート',
+    sectionTitle: '資料共有',
     sortLabel: '並べ替え',
     sortName: '名前',
     sortUpdated: '更新日時',
@@ -17,8 +17,8 @@ const COPY = {
     loadError: '保存済みスライドを読み込めませんでした: {{message}}',
     deleteError: 'テンプレートを削除できませんでした: {{message}}',
     deleteConfirm: '「{{title}}」を削除しますか？',
-    open: '開く',
-    delete: '削除',
+    open: '編集',
+    delete: 'アクセス取り消し',
     deleting: '削除中...',
     manageLink: 'リンクを管理',
     accessTitle: 'アクセス権限一覧',
@@ -26,15 +26,16 @@ const COPY = {
     tablePermission: '現在の権限',
     tableUpdated: '更新日',
     tableAction: 'アクション',
+    permissionLabel: '共有権限',
     slides: '{{count}}スライド',
     privateAccess: 'プライベート',
     linkAccess: 'リンクを知っている全員',
     invitedAccess: '招待された人のみ',
+    invitedCount: '{{count}}名',
     noDate: '未保存',
   },
   vi: {
-    title: 'Slide của tôi',
-    subtitle: 'Danh sách template đã lưu',
+    sectionTitle: 'Chia sẻ tài liệu',
     sortLabel: 'Sắp xếp',
     sortName: 'Tên',
     sortUpdated: 'Cập nhật',
@@ -45,8 +46,8 @@ const COPY = {
     loadError: 'Không thể tải slide đã lưu: {{message}}',
     deleteError: 'Không thể xóa template: {{message}}',
     deleteConfirm: 'Xóa template "{{title}}" khỏi danh sách đã lưu?',
-    open: 'Mở',
-    delete: 'Xóa',
+    open: 'Chỉnh sửa',
+    delete: 'Thu hồi quyền truy cập',
     deleting: 'Đang xóa...',
     manageLink: 'Quản lý link',
     accessTitle: 'Danh sách quyền truy cập',
@@ -54,10 +55,12 @@ const COPY = {
     tablePermission: 'Quyền hiện tại',
     tableUpdated: 'Ngày cập nhật',
     tableAction: 'Thao tác',
+    permissionLabel: 'Quyền chia sẻ',
     slides: '{{count}} slide',
     privateAccess: 'Riêng tư',
     linkAccess: 'Ai có link đều xem được',
     invitedAccess: 'Chỉ người được mời',
+    invitedCount: '{{count}} người',
     noDate: 'Chưa lưu',
   },
 };
@@ -74,13 +77,8 @@ function formatCopy(template, vars = {}) {
 
 function formatDate(value, language, copy) {
   if (!value) return copy.noDate;
-
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return copy.noDate;
-  }
-
+  if (Number.isNaN(date.getTime())) return copy.noDate;
   return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'ja-JP', {
     day: '2-digit',
     month: '2-digit',
@@ -98,32 +96,18 @@ function getTemplateTime(template) {
 
 function getAccess(template, copy) {
   if (template.visibility === 'unlisted') {
-    return {
-      icon: 'users',
-      label: copy.invitedAccess,
-      tone: 'invited',
-    };
+    return { icon: 'users', label: copy.invitedAccess, tone: 'invited' };
   }
-
   if (template.is_public || template.visibility === 'public') {
-    return {
-      icon: 'link',
-      label: copy.linkAccess,
-      tone: 'link',
-    };
+    return { icon: 'link', label: copy.linkAccess, tone: 'link' };
   }
-
-  return {
-    icon: 'lock',
-    label: copy.privateAccess,
-    tone: 'private',
-  };
+  return { icon: 'lock', label: copy.privateAccess, tone: 'private' };
 }
 
-function SmallIcon({ name }) {
+function SmallIcon({ name, size = 18 }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: size,
+    height: size,
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
@@ -132,7 +116,6 @@ function SmallIcon({ name }) {
     strokeLinejoin: 'round',
     'aria-hidden': 'true',
   };
-
   switch (name) {
     case 'link':
       return (
@@ -172,21 +155,40 @@ function SmallIcon({ name }) {
           <path d="M8 7h9v9" />
         </svg>
       );
+    case 'pencil':
+      return (
+        <svg {...common}>
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      );
+    case 'chevron':
+      return (
+        <svg {...common} width={14} height={14}>
+          <path d="M6 9l6-6 6 6" />
+        </svg>
+      );
     default:
       return null;
   }
 }
 
 function TemplatePreview({ template, title }) {
-  if (template.thumbnail_url) {
-    return <img src={template.thumbnail_url} alt={title} />;
+  if (template.first_slide) {
+    return <SlidePreviewThumbnail slide={template.first_slide} title={title} />;
   }
 
+  if (template.thumbnail_url) {
+    return <img src={template.thumbnail_url} alt={title} className="ms-card__thumb-img" />;
+  }
   return (
-    <div className="my-slides-preview-fallback" aria-hidden="true">
-      <span />
-      <strong>{title}</strong>
-      <small>{template.description || 'RakuSlide'}</small>
+    <div className="ms-card__thumb-fallback" aria-hidden="true">
+      <div className="ms-card__thumb-grid">
+        <div className="ms-thumb-cell"><span>{title}</span></div>
+        <div className="ms-thumb-cell ms-thumb-cell--alt"><span>RakuSlide</span></div>
+        <div className="ms-thumb-cell"><span>スライド</span></div>
+        <div className="ms-thumb-cell ms-thumb-cell--dim"><span>Slide</span></div>
+      </div>
     </div>
   );
 }
@@ -202,75 +204,52 @@ export default function MySlides({ currentUserId, onOpenTemplate }) {
 
   useEffect(() => {
     let isMounted = true;
-
-    if (!currentUserId) {
-      return () => {
-        isMounted = false;
-      };
-    }
+    if (!currentUserId) return () => { isMounted = false; };
 
     Promise.resolve()
       .then(() => {
         if (!isMounted) return [];
-
         setIsLoading(true);
         setError('');
         return listSavedTemplates(currentUserId);
       })
       .then((loadedTemplates) => {
-        if (isMounted) {
-          setTemplates(loadedTemplates);
-        }
+        if (isMounted) setTemplates(loadedTemplates);
       })
       .catch((loadFailure) => {
-        if (isMounted) {
-          setError(formatCopy(copy.loadError, { message: loadFailure.message }));
-        }
+        if (isMounted) setError(formatCopy(copy.loadError, { message: loadFailure.message }));
       })
       .finally(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [copy.loadError, currentUserId]);
 
   const sortedTemplates = useMemo(() => {
     const nextTemplates = [...templates];
-
     if (sortBy === 'name') {
-      nextTemplates.sort((a, b) => getTemplateTitle(a, copy).localeCompare(
-        getTemplateTitle(b, copy),
-        language === 'vi' ? 'vi' : 'ja',
-      ));
+      nextTemplates.sort((a, b) =>
+        getTemplateTitle(a, copy).localeCompare(getTemplateTitle(b, copy), language === 'vi' ? 'vi' : 'ja')
+      );
     } else if (sortBy === 'permission') {
-      nextTemplates.sort((a, b) => getAccess(a, copy).label.localeCompare(
-        getAccess(b, copy).label,
-        language === 'vi' ? 'vi' : 'ja',
-      ));
+      nextTemplates.sort((a, b) =>
+        getAccess(a, copy).label.localeCompare(getAccess(b, copy).label, language === 'vi' ? 'vi' : 'ja')
+      );
     } else {
       nextTemplates.sort((a, b) => getTemplateTime(b) - getTemplateTime(a));
     }
-
     return nextTemplates;
   }, [copy, language, sortBy, templates]);
 
   async function handleDeleteTemplate(template) {
     const title = getTemplateTitle(template, copy);
-
-    if (!window.confirm(formatCopy(copy.deleteConfirm, { title }))) {
-      return;
-    }
-
+    if (!window.confirm(formatCopy(copy.deleteConfirm, { title }))) return;
     setDeletingTemplateId(template.id);
     setError('');
-
     try {
       await deleteSavedTemplate(template.id, currentUserId);
-      setTemplates((currentTemplates) => currentTemplates.filter((item) => item.id !== template.id));
+      setTemplates((curr) => curr.filter((item) => item.id !== template.id));
     } catch (deleteFailure) {
       setError(formatCopy(copy.deleteError, { message: deleteFailure.message }));
     } finally {
@@ -279,85 +258,98 @@ export default function MySlides({ currentUserId, onOpenTemplate }) {
   }
 
   return (
-    <section className="my-slides" aria-labelledby="mySlidesTitle">
-      <div className="my-slides__header">
-        <div>
-          <p className="my-slides__eyebrow">{copy.subtitle}</p>
-          <h1 id="mySlidesTitle">{copy.title}</h1>
-        </div>
+    <section className="ms-page" aria-labelledby="msSectionTitle">
+      {/* ───── Section header ───── */}
+      <div className="ms-page__header">
+        <h1 id="msSectionTitle" className="ms-page__title">{copy.sectionTitle}</h1>
 
-        <label className="my-slides__sort">
-          <span>{copy.sortLabel}</span>
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-            {SORT_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {copy[`sort${option.charAt(0).toUpperCase()}${option.slice(1)}`]}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Sort selector */}
+        <div className="ms-sort-bar" aria-label={copy.sortLabel}>
+          <span className="ms-sort-bar__label">{copy.sortLabel}：</span>
+          {SORT_OPTIONS.map((opt, idx) => {
+            const label = copy[`sort${opt.charAt(0).toUpperCase()}${opt.slice(1)}`];
+            return (
+              <span key={opt}>
+                {idx > 0 && <span className="ms-sort-bar__sep"> / </span>}
+                <button
+                  type="button"
+                  className={`ms-sort-bar__opt${sortBy === opt ? ' ms-sort-bar__opt--active' : ''}`}
+                  onClick={() => setSortBy(opt)}
+                >
+                  {label}
+                </button>
+              </span>
+            );
+          })}
+          <span className="ms-sort-bar__chevron">∨</span>
+        </div>
       </div>
 
-      {error && <div className="my-slides__error" role="alert">{error}</div>}
+      {error && <div className="ms-alert" role="alert">{error}</div>}
 
       {isLoading ? (
-        <div className="my-slides__status">{copy.loading}</div>
+        <div className="ms-status">{copy.loading}</div>
       ) : sortedTemplates.length === 0 ? (
-        <div className="my-slides__empty">
+        <div className="ms-empty">
           <h2>{copy.emptyTitle}</h2>
           <p>{copy.emptyText}</p>
         </div>
       ) : (
         <>
-          <div className="my-slides__grid">
+          {/* ───── Slide cards ───── */}
+          <div className="ms-grid">
             {sortedTemplates.map((template) => {
               const title = getTemplateTitle(template, copy);
               const access = getAccess(template, copy);
-              const updatedDate = formatDate(template.updated_at ?? template.created_at, language, copy);
-              const isDeleting = deletingTemplateId === template.id;
 
               return (
-                <article className="my-slide-card" key={template.id}>
-                  <div className="my-slide-card__preview">
+                <article className="ms-card" key={template.id}>
+                  {/* Preview thumbnail */}
+                  <button
+                    type="button"
+                    className="ms-card__thumb"
+                    onClick={() => onOpenTemplate(template.id)}
+                    aria-label={`${copy.open} ${title}`}
+                  >
                     <TemplatePreview template={template} title={title} />
-                  </div>
+                  </button>
 
-                  <div className="my-slide-card__body">
-                    <div>
-                      <h2>{title}</h2>
-                      <p>{formatCopy(copy.slides, { count: template.slide_count ?? 0 })} · {updatedDate}</p>
+                  {/* Card body */}
+                  <div className="ms-card__body">
+                    <p className="ms-card__perm-label">
+                      {title}：{copy.permissionLabel}
+                    </p>
+
+                    {/* Permission badge */}
+                    <div className={`ms-badge ms-badge--${access.tone}`}>
+                      <SmallIcon name={access.icon} size={16} />
+                      <span>{access.label}</span>
+                      {access.tone === 'invited' && (
+                        <span className="ms-badge__count">
+                          {formatCopy(copy.invitedCount, { count: template.invited_count ?? 5 })}
+                        </span>
+                      )}
                     </div>
 
-                    <span className={`my-slide-card__access my-slide-card__access--${access.tone}`}>
-                      <SmallIcon name={access.icon} />
-                      {access.label}
-                    </span>
-
-                    <div className="my-slide-card__actions">
-                      <button type="button" onClick={() => onOpenTemplate(template.id)}>
-                        <SmallIcon name="open" />
-                        {copy.open}
-                      </button>
-                      <button
-                        type="button"
-                        className="my-slide-card__delete"
-                        onClick={() => handleDeleteTemplate(template)}
-                        disabled={isDeleting}
-                      >
-                        <SmallIcon name="trash" />
-                        {isDeleting ? copy.deleting : copy.delete}
-                      </button>
-                    </div>
+                    {/* Manage link button */}
+                    <button
+                      type="button"
+                      className="ms-card__manage-btn"
+                      onClick={() => onOpenTemplate(template.id)}
+                    >
+                      {copy.manageLink}
+                    </button>
                   </div>
                 </article>
               );
             })}
           </div>
 
-          <section className="my-slides__access-list" aria-labelledby="accessListTitle">
-            <h2 id="accessListTitle">{copy.accessTitle}</h2>
-            <div className="my-slides__table-wrap">
-              <table>
+          {/* ───── Access table ───── */}
+          <section className="ms-access-section" aria-labelledby="msAccessTitle">
+            <h2 id="msAccessTitle" className="ms-access-section__title">{copy.accessTitle}</h2>
+            <div className="ms-table-wrap">
+              <table className="ms-table">
                 <thead>
                   <tr>
                     <th>{copy.tableTemplate}</th>
@@ -377,13 +369,17 @@ export default function MySlides({ currentUserId, onOpenTemplate }) {
                         <td>{title}</td>
                         <td>{access.label}</td>
                         <td>{formatDate(template.updated_at ?? template.created_at, language, copy)}</td>
-                        <td>
-                          <button type="button" onClick={() => onOpenTemplate(template.id)}>
+                        <td className="ms-table__actions">
+                          <button
+                            type="button"
+                            className="ms-table-btn ms-table-btn--edit"
+                            onClick={() => onOpenTemplate(template.id)}
+                          >
                             {copy.open}
                           </button>
                           <button
                             type="button"
-                            className="my-slides__table-delete"
+                            className="ms-table-btn ms-table-btn--revoke"
                             onClick={() => handleDeleteTemplate(template)}
                             disabled={isDeleting}
                           >

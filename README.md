@@ -22,9 +22,12 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_or_publishable_key
 VITE_GOOGLE_CSE_API_KEY=your_google_custom_search_api_key
 VITE_GOOGLE_CSE_ID=your_google_programmable_search_engine_id
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_GEMINI_MODEL=gemini-2.5-flash
 ```
 
 `VITE_GOOGLE_CSE_API_KEY` và `VITE_GOOGLE_CSE_ID` dùng cho chức năng tìm ảnh bằng Google Custom Search API.
+`VITE_GEMINI_API_KEY` dùng cho chức năng AI text tạo dàn ý và nội dung slide bằng Gemini API.
 
 ## Chạy project
 
