@@ -3,75 +3,16 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 const SYSTEM_PROMPT = `
 You are an instructional slide drafting assistant for RakuSlide.
-Your job is to turn a user's topic and keywords into a lesson outline and detailed draft text for slides.
+Your job is to turn a user's topic and keywords into a lesson outline with layout instructions and detailed text content for each slide.
 Write in the same language as the user's request.
-Return only valid JSON. Do not wrap the JSON in markdown.
-The JSON schema must be:
-{
-  "deckTitle": "short presentation title",
-  "slides": [
-    {
-      "title": "slide title",
-      "bullets": ["3 to 5 concise bullet points"],
-      "speakerNotes": "short detailed explanation for this slide"
-    }
-  ]
-}
-Create 4 to 7 slides unless the user requests a different number.
-Keep each bullet useful for direct insertion into a slide.
+Return ONLY the markdown content itself. Do NOT include any introductory or closing sentence such as "Here is the draft..." or "Below is the outline...". Start directly with the first slide heading.
+Format the output as clean markdown: use ## for each slide title, bullet points for content, and **bold** for important terms. Keep it concise and structured.
 `;
 
 function getGeminiConfig() {
   return {
     apiKey: import.meta.env.VITE_GEMINI_API_KEY?.trim(),
     model: import.meta.env.VITE_GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
-  };
-}
-
-function stripJsonFence(value) {
-  return String(value ?? '')
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
-}
-
-function parseGeminiJson(text) {
-  const cleanedText = stripJsonFence(text);
-
-  try {
-    return JSON.parse(cleanedText);
-  } catch {
-    const jsonStart = cleanedText.indexOf('{');
-    const jsonEnd = cleanedText.lastIndexOf('}');
-
-    if (jsonStart >= 0 && jsonEnd > jsonStart) {
-      return JSON.parse(cleanedText.slice(jsonStart, jsonEnd + 1));
-    }
-
-    throw new Error('Gemini did not return valid JSON.');
-  }
-}
-
-function normalizeGeneratedDeck(payload, fallbackTitle) {
-  const slides = Array.isArray(payload?.slides) ? payload.slides : [];
-  const normalizedSlides = slides
-    .map((slide, index) => {
-      const bullets = Array.isArray(slide?.bullets)
-        ? slide.bullets.map((item) => String(item).trim()).filter(Boolean)
-        : [];
-
-      return {
-        bullets,
-        speakerNotes: String(slide?.speakerNotes ?? '').trim(),
-        title: String(slide?.title ?? `Slide ${index + 1}`).trim() || `Slide ${index + 1}`,
-      };
-    })
-    .filter((slide) => slide.title || slide.bullets.length || slide.speakerNotes);
-
-  return {
-    deckTitle: String(payload?.deckTitle ?? fallbackTitle ?? '').trim() || fallbackTitle,
-    slides: normalizedSlides,
   };
 }
 
@@ -84,7 +25,7 @@ function getGeminiText(responsePayload) {
     .trim();
 }
 
-export async function generateSlideDraftWithGemini({ prompt, deckTitle }) {
+export async function generateAiTextWithGemini({ prompt, deckTitle }) {
   const { apiKey, model } = getGeminiConfig();
 
   if (!apiKey) {
@@ -107,14 +48,14 @@ export async function generateSlideDraftWithGemini({ prompt, deckTitle }) {
               text: [
                 `Current deck title: ${deckTitle || 'Untitled deck'}`,
                 `User topic and keywords: ${userPrompt}`,
-                'Generate a lesson slide draft for this deck.',
+                'Generate a lesson slide draft for this deck, including layout instructions and detailed text content for each slide.',
               ].join('\n'),
             },
           ],
         },
       ],
       generationConfig: {
-        responseMimeType: 'application/json',
+        responseMimeType: 'text/plain',
         temperature: 0.7,
       },
       system_instruction: {
@@ -140,5 +81,5 @@ export async function generateSlideDraftWithGemini({ prompt, deckTitle }) {
     throw new Error('Gemini returned an empty response.');
   }
 
-  return normalizeGeneratedDeck(parseGeminiJson(text), deckTitle);
+  return text;
 }

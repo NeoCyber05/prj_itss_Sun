@@ -30,6 +30,7 @@ function normalizeTemplate(row) {
     ...row,
     slide_count: row.slide_count ?? row.page_count ?? 1,
     visibility: row.visibility ?? (row.is_public ? 'public' : 'private'),
+    share_settings: row.share_settings ?? {},
     status: row.status ?? 'draft',
   };
 }
@@ -70,6 +71,22 @@ function isMissingLastOpenedAtError(error) {
   return error?.code === '42703'
     || error?.code === 'PGRST204'
     || message.includes('last_opened_at');
+}
+
+function isMissingShareSettingsError(error) {
+  const message = String(error?.message ?? '');
+
+  return error?.code === '42703'
+    || error?.code === 'PGRST204'
+    || message.includes('share_settings');
+}
+
+function isMissingVisibilityError(error) {
+  const message = String(error?.message ?? '');
+
+  return error?.code === '42703'
+    || error?.code === 'PGRST204'
+    || message.includes('visibility');
 }
 
 function getRecentTemplateStorageKey(userId) {
@@ -526,31 +543,120 @@ export async function updateTemplateShareAccess({
   requireValue(templateId, 'A template id is required to update sharing.');
   requireValue(userId, 'A signed-in user is required to update sharing.');
 
-  const isPublic = accessMode === 'link' || accessMode === 'public';
+  const normalizedAccessMode = accessMode === 'link' ? 'public' : accessMode;
+  const isPublic = normalizedAccessMode === 'public';
+  const visibility = normalizedAccessMode === 'unlisted'
+    ? 'unlisted'
+    : isPublic
+      ? 'public'
+      : 'private';
 
   const { data: template, error: templateError } = await supabase
     .from('templates')
-    .update({ is_public: isPublic })
+    .update({ is_public: isPublic, visibility })
+    .eq('id', templateId)
+    .eq('owner_id', userId)
+    .select('*')
+    .single();
+
+  if (templateError && !isMissingVisibilityError(templateError)) {
+    throw templateError;
+  }
+
+  let updatedTemplate = template;
+
+  if (templateError) {
+    const { data: fallbackTemplate, error: fallbackTemplateError } = await supabase
+      .from('templates')
+      .update({ is_public: isPublic })
+      .eq('id', templateId)
+      .eq('owner_id', userId)
+      .select('*')
+      .single();
+
+    if (fallbackTemplateError) {
+      throw fallbackTemplateError;
+    }
+
+    updatedTemplate = {
+      ...fallbackTemplate,
+      visibility,
+    };
+  }
+
+  const { error: presentationError } = await supabase
+    .from('presentations')
+    .update({ is_public: isPublic, visibility })
+    .eq('id', templateId)
+    .eq('owner_id', userId);
+
+  if (presentationError && !isMissingVisibilityError(presentationError)) {
+    throw presentationError;
+  }
+
+  if (presentationError) {
+    const { error: fallbackPresentationError } = await supabase
+      .from('presentations')
+      .update({ is_public: isPublic })
+      .eq('id', templateId)
+      .eq('owner_id', userId);
+
+    if (fallbackPresentationError) {
+      throw fallbackPresentationError;
+    }
+  }
+
+  return normalizeTemplate(updatedTemplate);
+}
+
+export async function updateTemplateShareSettings({
+  templateId,
+  userId,
+  settings,
+}) {
+  requireValue(templateId, 'A template id is required to update sharing settings.');
+  requireValue(userId, 'A signed-in user is required to update sharing settings.');
+
+  const normalizedSettings = {
+    allowDownload: Boolean(settings?.allowDownload),
+    allowCopy: Boolean(settings?.allowCopy),
+    allowEdit: Boolean(settings?.allowEdit),
+    allowReshare: Boolean(settings?.allowReshare),
+  };
+
+  const { data: template, error: templateError } = await supabase
+    .from('templates')
+    .update({ share_settings: normalizedSettings })
     .eq('id', templateId)
     .eq('owner_id', userId)
     .select('*')
     .single();
 
   if (templateError) {
-    throw templateError;
+    if (!isMissingShareSettingsError(templateError)) {
+      throw templateError;
+    }
+
+    return {
+      share_settings: normalizedSettings,
+      share_settings_persisted: false,
+    };
   }
 
   const { error: presentationError } = await supabase
     .from('presentations')
-    .update({ is_public: isPublic })
+    .update({ share_settings: normalizedSettings })
     .eq('id', templateId)
     .eq('owner_id', userId);
 
-  if (presentationError) {
+  if (presentationError && !isMissingShareSettingsError(presentationError)) {
     throw presentationError;
   }
 
-  return normalizeTemplate(template);
+  return {
+    ...normalizeTemplate(template),
+    share_settings_persisted: !presentationError,
+  };
 }
 
 export async function saveDeckForEditor({

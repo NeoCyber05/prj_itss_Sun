@@ -4,6 +4,7 @@ const DEFAULT_FONT_FAMILY = 'Inter, Arial, sans-serif';
 const DEFAULT_TABLE_ROWS = 3;
 const DEFAULT_TABLE_COLUMNS = 4;
 const DEFAULT_CHART_VALUES = [120, 180, 150, 240];
+const DEFAULT_QUIZ_OPTIONS = ['A', 'B', 'C', 'D'];
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -90,6 +91,18 @@ function normalizeChart(chart = {}) {
   };
 }
 
+function normalizeQuiz(quiz = {}) {
+  const options = Array.isArray(quiz.options) && quiz.options.length
+    ? quiz.options
+    : DEFAULT_QUIZ_OPTIONS;
+
+  return {
+    question: String(quiz.question ?? ''),
+    options: options.map((option) => String(option ?? '')).slice(0, 4),
+    type: quiz.type === 'written' ? 'written' : 'choice',
+  };
+}
+
 function TablePreview({ table }) {
   const config = normalizeTable(table);
 
@@ -126,6 +139,23 @@ function ChartPreview({ chart }) {
           <b>{config.labels[index]}</b>
         </span>
       ))}
+    </div>
+  );
+}
+
+function QuizPreview({ quiz }) {
+  const config = normalizeQuiz(quiz);
+
+  return (
+    <div className="slide-preview-thumbnail__quiz-preview">
+      <strong>{config.question}</strong>
+      <div>
+        {config.type === 'choice'
+          ? config.options.map((option, index) => (
+              <span key={`${option}-${index}`}>{option}</span>
+            ))
+          : <span />}
+      </div>
     </div>
   );
 }
@@ -176,6 +206,14 @@ function PreviewElement({ element }) {
       <div className="slide-preview-thumbnail__element slide-preview-thumbnail__element--chart" style={frameStyle}>
         {element.text && <strong>{element.text}</strong>}
         <ChartPreview chart={element.chart} />
+      </div>
+    );
+  }
+
+  if (type === 'quiz') {
+    return (
+      <div className="slide-preview-thumbnail__element slide-preview-thumbnail__element--quiz" style={frameStyle}>
+        <QuizPreview quiz={element.quiz} />
       </div>
     );
   }

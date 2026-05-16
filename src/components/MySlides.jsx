@@ -28,8 +28,8 @@ const COPY = {
     tableAction: 'アクション',
     permissionLabel: '共有権限',
     slides: '{{count}}スライド',
-    privateAccess: 'プライベート',
-    linkAccess: 'リンクを知っている全員',
+    publicAccess: '公開',
+    privateAccess: '非公開',
     invitedAccess: '招待された人のみ',
     invitedCount: '{{count}}名',
     noDate: '未保存',
@@ -57,9 +57,9 @@ const COPY = {
     tableAction: 'Thao tác',
     permissionLabel: 'Quyền chia sẻ',
     slides: '{{count}} slide',
+    publicAccess: 'Công khai',
     privateAccess: 'Riêng tư',
-    linkAccess: 'Ai có link đều xem được',
-    invitedAccess: 'Chỉ người được mời',
+    invitedAccess: 'Chỉ dành cho người được mời',
     invitedCount: '{{count}} người',
     noDate: 'Chưa lưu',
   },
@@ -99,7 +99,7 @@ function getAccess(template, copy) {
     return { icon: 'users', label: copy.invitedAccess, tone: 'invited' };
   }
   if (template.is_public || template.visibility === 'public') {
-    return { icon: 'link', label: copy.linkAccess, tone: 'link' };
+    return { icon: 'link', label: copy.publicAccess, tone: 'link' };
   }
   return { icon: 'lock', label: copy.privateAccess, tone: 'private' };
 }

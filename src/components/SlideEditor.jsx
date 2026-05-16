@@ -4,8 +4,10 @@ import {
   getDeckForEditor,
   saveDeckForEditor,
   updateTemplateShareAccess,
+  updateTemplateShareSettings,
 } from '../services/slideCreationService.js';
-import { generateSlideDraftWithGemini } from '../services/geminiSlideService.js';
+import { generateAiTextWithGemini } from '../services/geminiSlideService.js';
+import ReactMarkdown from 'react-markdown';
 import './SlideEditor.css';
 
 const EDITOR_COPY = {
@@ -79,13 +81,22 @@ const EDITOR_COPY = {
     shareOwnerName: 'あなた',
     shareOwnerRole: '所有者',
     shareAccessTitle: 'アクセス権限',
-    sharePrivateAccess: 'あなたのみアクセス可能',
-    shareLinkAccess: 'リンクを知っている全員',
+    sharePublicAccess: '公開',
+    sharePrivateAccess: '非公開',
+    shareInvitedAccess: '招待された人のみ',
     shareCopyLink: 'リンクをコピー',
     shareAccessUpdated: '共有権限を更新しました',
     shareAccessError: '共有権限を更新できませんでした: {{message}}',
     shareInviteAdded: 'ユーザーを追加しました',
     shareInviteEmpty: 'メールアドレスを入力してください',
+    shareAdvancedTitle: '詳細設定',
+    shareAdvancedDescription: '共有リンクから閲覧者が実行できる操作を管理します。',
+    shareAllowDownload: '閲覧者のダウンロードを許可',
+    shareAllowCopy: '閲覧者のコピーを許可',
+    shareAllowEdit: '閲覧者の編集を許可',
+    shareAllowReshare: '閲覧者の再共有を許可',
+    shareSettingsUpdated: '共有設定を更新しました',
+    shareSettingsLocalOnly: '共有設定を画面上で更新しました。保存するには Supabase に share_settings 列を追加してください。',
     closeShare: '閉じる',
     uploadImageLabel: 'Upload image',
     copySelection: 'Copy',
@@ -118,6 +129,41 @@ const EDITOR_COPY = {
     quizQuestionLabel: 'Question',
     quizAnswerLabel: 'Answer',
     closeQuiz: 'Close',
+    quizBuilderTitle: 'Create Quiz',
+    quizTypeLabel: 'Question type',
+    quizTypeChoice: 'Multiple choice',
+    quizTypeWritten: 'Written answer',
+    quizQuestionPlaceholder: 'Enter question text',
+    quizHintLabel: 'Hint',
+    quizHintPlaceholder: 'Optional hint',
+    quizOptionPlaceholder: 'Option {{letter}}',
+    quizCorrectLabel: 'Correct',
+    quizAddOption: 'Add option',
+    quizOptionLimit: 'Up to 4 options.',
+    quizSaveQuestion: 'Save question',
+    quizUpdateQuestion: 'Update question',
+    quizOverviewTitle: 'Quiz summary',
+    quizQuestionCount: 'Questions: {{count}}',
+    quizQuestionListTitle: 'Question list',
+    quizColumnNumber: 'No.',
+    quizColumnQuestion: 'Question',
+    quizColumnType: 'Type',
+    quizColumnAction: 'Action',
+    quizEditQuestion: 'Edit',
+    quizDeleteQuestion: 'Delete',
+    quizFinish: 'Finish quiz',
+    quizBack: 'Back',
+    quizNoQuestions: 'No questions yet.',
+    quizValidationQuestion: 'Enter the question.',
+    quizValidationChoice: 'Enter at least two options.',
+    quizValidationAnswer: 'Enter the answer.',
+    quizInserted: 'Inserted {{count}} quiz slides',
+    quizFinishing: 'Saving quiz...',
+    quizSlideTitle: 'Quiz',
+    quizTargetSlidePreview: 'Target slide preview',
+    quizCheckAnswer: 'Check answer',
+    quizCorrectFeedback: 'Correct',
+    quizWrongFeedback: 'Not correct',
   },
   vi: {
     backShort: 'Trang chủ',
@@ -189,13 +235,22 @@ const EDITOR_COPY = {
     shareOwnerName: 'Bạn',
     shareOwnerRole: 'Chủ sở hữu',
     shareAccessTitle: 'Quyền truy cập',
-    sharePrivateAccess: 'Chỉ bạn có quyền truy cập',
-    shareLinkAccess: 'Ai có link đều xem được',
+    sharePublicAccess: 'Công khai',
+    sharePrivateAccess: 'Riêng tư',
+    shareInvitedAccess: 'Chỉ dành cho người được mời',
     shareCopyLink: 'Sao chép link',
     shareAccessUpdated: 'Đã cập nhật quyền chia sẻ',
     shareAccessError: 'Không thể cập nhật quyền chia sẻ: {{message}}',
     shareInviteAdded: 'Đã thêm người dùng',
     shareInviteEmpty: 'Nhập email người dùng cần thêm',
+    shareAdvancedTitle: 'Cài đặt chia sẻ chi tiết',
+    shareAdvancedDescription: 'Kiểm soát những thao tác người xem được phép dùng từ link chia sẻ.',
+    shareAllowDownload: 'Cho phép người xem tải xuống',
+    shareAllowCopy: 'Cho phép người xem sao chép',
+    shareAllowEdit: 'Cho phép người xem chỉnh sửa',
+    shareAllowReshare: 'Cho phép người xem chia sẻ lại',
+    shareSettingsUpdated: 'Đã cập nhật cài đặt chia sẻ',
+    shareSettingsLocalOnly: 'Đã cập nhật cài đặt trên giao diện. Thêm cột share_settings vào Supabase để lưu lâu dài.',
     closeShare: 'Đóng',
     uploadImageLabel: 'Tải ảnh lên',
     copySelection: 'Sao chép',
@@ -228,6 +283,41 @@ const EDITOR_COPY = {
     quizQuestionLabel: 'Câu hỏi',
     quizAnswerLabel: 'Đáp án',
     closeQuiz: 'Đóng',
+    quizBuilderTitle: 'Tạo quiz',
+    quizTypeLabel: 'Loại câu hỏi',
+    quizTypeChoice: 'Lựa chọn',
+    quizTypeWritten: 'Trả lời ngắn',
+    quizQuestionPlaceholder: 'Nhập câu hỏi',
+    quizHintLabel: 'Gợi ý',
+    quizHintPlaceholder: 'Gợi ý tùy chọn',
+    quizOptionPlaceholder: 'Lựa chọn {{letter}}',
+    quizCorrectLabel: 'Đúng',
+    quizAddOption: 'Thêm lựa chọn',
+    quizOptionLimit: 'Tối đa 4 lựa chọn.',
+    quizSaveQuestion: 'Lưu câu hỏi',
+    quizUpdateQuestion: 'Cập nhật câu hỏi',
+    quizOverviewTitle: 'Tổng quan quiz',
+    quizQuestionCount: 'Số câu hỏi: {{count}}',
+    quizQuestionListTitle: 'Danh sách câu hỏi',
+    quizColumnNumber: 'Số',
+    quizColumnQuestion: 'Câu hỏi',
+    quizColumnType: 'Loại',
+    quizColumnAction: 'Hành động',
+    quizEditQuestion: 'Sửa',
+    quizDeleteQuestion: 'Xóa',
+    quizFinish: 'Hoàn tất quiz',
+    quizBack: 'Quay lại',
+    quizNoQuestions: 'Chưa có câu hỏi.',
+    quizValidationQuestion: 'Nhập nội dung câu hỏi.',
+    quizValidationChoice: 'Nhập ít nhất hai lựa chọn.',
+    quizValidationAnswer: 'Nhập đáp án.',
+    quizInserted: 'Đã chèn {{count}} slide quiz',
+    quizFinishing: 'Đang lưu quiz...',
+    quizSlideTitle: 'Quiz',
+    quizTargetSlidePreview: 'Ảnh xem trước slide',
+    quizCheckAnswer: 'Kiểm tra',
+    quizCorrectFeedback: 'Chính xác',
+    quizWrongFeedback: 'Chưa chính xác',
   },
 };
 
@@ -254,6 +344,9 @@ const LAYOUTS = [
   { id: 'title-image', labels: { ja: 'Title + image', vi: 'Tiêu đề + ảnh' } },
   { id: 'image-left', labels: { ja: 'Image + text', vi: 'Ảnh + nội dung' } },
   { id: 'comparison', labels: { ja: 'Comparison', vi: 'So sánh' } },
+  { id: 'bar-chart', labels: { ja: 'Bar chart', vi: 'Biểu đồ cột' } },
+  { id: 'quote', labels: { ja: 'Quote', vi: 'Trích dẫn' } },
+  { id: 'timeline', labels: { ja: 'Timeline', vi: 'Timeline' } },
   { id: 'cards', labels: { ja: '3 cards', vi: '3 thẻ' } },
   { id: 'blank', copyKey: 'blankLayout' },
 ];
@@ -266,11 +359,23 @@ const TEXT_FONT_FAMILIES = [
 ];
 
 const DEFAULT_TEXT_FONT_FAMILY = TEXT_FONT_FAMILIES[0].value;
+const DEFAULT_SHARE_SETTINGS = {
+  allowDownload: false,
+  allowCopy: true,
+  allowEdit: false,
+  allowReshare: false,
+};
 const MIN_TABLE_SIZE = 1;
 const MAX_TABLE_SIZE = 20;
 const DEFAULT_TABLE_ROWS = 3;
 const DEFAULT_TABLE_COLUMNS = 4;
 const DEFAULT_CHART_VALUES = [120, 180, 150, 240];
+const DEFAULT_QUIZ_OPTION_COUNT = 4;
+const MAX_QUIZ_OPTIONS = 4;
+const QUIZ_TYPE_OPTIONS = [
+  { id: 'choice', copyKey: 'quizTypeChoice' },
+  { id: 'written', copyKey: 'quizTypeWritten' },
+];
 const AI_TEXT_LABEL = '\u00dd ch\u00ednh';
 const AI_NOTES_LABEL = 'Ghi ch\u00fa';
 const AI_DRAFT_LABEL = 'AI draft';
@@ -409,6 +514,57 @@ function normalizeChartConfig(raw = {}, copy) {
   };
 }
 
+function getQuizOptionLetter(index) {
+  return String.fromCharCode(65 + index);
+}
+
+function createDefaultQuizOptions(copy) {
+  return Array.from({ length: DEFAULT_QUIZ_OPTION_COUNT }, (_, index) => (
+    formatCopy(copy.quizOptionPlaceholder, { letter: getQuizOptionLetter(index) })
+  ));
+}
+
+function createEmptyQuizForm(copy) {
+  return {
+    type: 'choice',
+    question: '',
+    hint: '',
+    options: createDefaultQuizOptions(copy),
+    correctOptionIndex: 0,
+    answer: '',
+  };
+}
+
+function normalizeQuizConfig(raw = {}, copy) {
+  const type = raw.type === 'written' ? 'written' : 'choice';
+  const defaultOptions = createDefaultQuizOptions(copy);
+  const rawOptions = Array.isArray(raw.options) ? raw.options : [];
+  const options = rawOptions.length
+    ? rawOptions.slice(0, MAX_QUIZ_OPTIONS).map((option) => String(option ?? ''))
+    : defaultOptions;
+  const safeCorrectIndex = Math.trunc(clamp(
+    Number(raw.correctOptionIndex ?? raw.correctIndex ?? 0),
+    0,
+    Math.max(options.length - 1, 0),
+  ));
+  const answer = String(
+    raw.answer
+      ?? raw.correctAnswer
+      ?? (type === 'choice' ? options[safeCorrectIndex] : '')
+      ?? '',
+  );
+
+  return {
+    id: raw.id ?? makeId('quiz'),
+    type,
+    question: String(raw.question ?? raw.prompt ?? copy.quizQuestionPlaceholder ?? ''),
+    hint: String(raw.hint ?? ''),
+    options,
+    correctOptionIndex: safeCorrectIndex,
+    answer,
+  };
+}
+
 function normalizeLinkUrl(value) {
   const url = String(value ?? '').trim();
 
@@ -448,42 +604,13 @@ function cloneEditorElement(element) {
           cells: [...(element.table.cells ?? [])],
         }
       : undefined,
+    quiz: element.quiz
+      ? {
+          ...element.quiz,
+          options: [...(element.quiz.options ?? [])],
+        }
+      : undefined,
   };
-}
-
-function getSlidePlainText(slide) {
-  return (slide?.elements ?? [])
-    .filter((element) => element.type === 'text')
-    .map((element) => element.text?.trim())
-    .filter(Boolean)
-    .join(' ');
-}
-
-function buildQuizQuestions(slide, fallbackTitle, copy) {
-  const slideText = getSlidePlainText(slide);
-  const title = getSlideDisplayTitle(slide, fallbackTitle);
-  const subject = slideText || title;
-  const hasChart = slide?.elements?.some((element) => element.type === 'chart');
-  const hasTable = slide?.elements?.some((element) => element.type === 'table');
-
-  return [
-    {
-      question: `Nội dung chính của slide "${title}" là gì?`,
-      answer: subject,
-    },
-    {
-      question: hasChart
-        ? 'Biểu đồ trong slide đang thể hiện xu hướng nào?'
-        : 'Tiêu đề nào phù hợp nhất với slide này?',
-      answer: hasChart ? 'Người học cần đọc dữ liệu trên biểu đồ và rút ra xu hướng chính.' : title,
-    },
-    {
-      question: hasTable
-        ? 'Bảng dữ liệu trong slide dùng để so sánh thông tin nào?'
-        : copy.quizPrompt,
-      answer: hasTable ? 'Người học cần dựa vào các hàng và cột trong bảng để trả lời.' : subject,
-    },
-  ];
 }
 
 function slugForKey(value) {
@@ -754,6 +881,7 @@ function normalizeElement(raw, index, copy) {
     },
     chart: type === 'chart' ? normalizeChartConfig(raw?.chart, copy) : raw?.chart,
     table: type === 'table' ? normalizeTableConfig(raw?.table) : raw?.table,
+    quiz: type === 'quiz' ? normalizeQuizConfig(raw?.quiz, copy) : raw?.quiz,
   };
 }
 
@@ -881,6 +1009,19 @@ function createElement(type, copy, index = 0, overrides = {}) {
     };
   }
 
+  if (type === 'quiz') {
+    return {
+      ...base,
+      x: 8,
+      y: 8,
+      width: 84,
+      height: 80,
+      text: copy.quizSlideTitle,
+      ...overrides,
+      quiz: normalizeQuizConfig(overrides.quiz, copy),
+    };
+  }
+
   return {
     ...base,
     ...overrides,
@@ -916,6 +1057,40 @@ function buildLayoutElements(layoutId, templateTitle, copy) {
         y: 34,
         width: 80,
         height: 42,
+      }),
+    ];
+  }
+
+  if (layoutId === 'bar-chart') {
+    return [
+      ...title,
+      createElement('chart', copy, 2, {
+        x: 10,
+        y: 34,
+        width: 54,
+        height: 42,
+        chart: normalizeChartConfig({
+          labels: ['A', 'B', 'C', 'D'],
+          title: copy.chartLabel,
+          values: [120, 180, 90, 240],
+        }, copy),
+      }),
+      createElement('text', copy, 3, {
+        x: 68,
+        y: 38,
+        width: 22,
+        height: 34,
+        text: copy.sampleText,
+        style: {
+          align: 'left',
+          bold: true,
+          color: '#111827',
+          fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+          fontSize: 16,
+          italic: false,
+          underline: false,
+          verticalAlign: 'top',
+        },
       }),
     ];
   }
@@ -1001,6 +1176,75 @@ function buildLayoutElements(layoutId, templateTitle, copy) {
         text: 'B',
         fill: '#f8fafc',
       }),
+    ];
+  }
+
+  if (layoutId === 'quote') {
+    return [
+      title[0],
+      createElement('text', copy, 1, {
+        x: 16,
+        y: 34,
+        width: 68,
+        height: 26,
+        text: `"${copy.sampleText}"`,
+        style: {
+          align: 'center',
+          bold: true,
+          color: '#0f172a',
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontSize: 28,
+          italic: false,
+          underline: false,
+        },
+      }),
+      createElement('text', copy, 2, {
+        x: 34,
+        y: 64,
+        width: 32,
+        height: 8,
+        text: '- RakuSlide',
+        style: {
+          align: 'center',
+          bold: false,
+          color: '#475569',
+          fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+          fontSize: 14,
+          italic: false,
+          underline: false,
+        },
+      }),
+    ];
+  }
+
+  if (layoutId === 'timeline') {
+    return [
+      ...title,
+      createElement('shape', copy, 2, {
+        x: 14,
+        y: 48,
+        width: 72,
+        height: 2,
+        text: '',
+        fill: '#2563eb',
+        stroke: '#2563eb',
+      }),
+      ...[0, 1, 2].map((stepIndex) => createElement('text', copy, stepIndex + 3, {
+        x: 10 + stepIndex * 30,
+        y: 56,
+        width: 20,
+        height: 16,
+        text: `${stepIndex + 1}. ${copy.sampleText}`,
+        style: {
+          align: 'center',
+          bold: true,
+          color: '#111827',
+          fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+          fontSize: 13,
+          italic: false,
+          underline: false,
+        },
+      })),
     ];
   }
 
@@ -1208,6 +1452,29 @@ function buildAiDraftSlides(generatedDeck, copy) {
   });
 }
 
+function buildQuizSlides(questions, copy) {
+  return questions.map((question, index) => {
+    const quiz = normalizeQuizConfig(question, copy);
+    const title = `${copy.quizSlideTitle} ${index + 1}`;
+
+    return {
+      id: makeId('quiz-slide'),
+      position: index + 1,
+      title,
+      elements: [
+        createElement('quiz', copy, 0, {
+          x: 6,
+          y: 7,
+          width: 88,
+          height: 82,
+          text: title,
+          quiz,
+        }),
+      ],
+    };
+  });
+}
+
 function buildEditableSlides(sourceSlides, template, copy) {
   const slides = sourceSlides?.length ? sourceSlides : [{ id: 'local-slide-1', position: 1 }];
 
@@ -1253,7 +1520,18 @@ function applyTitleToSlide(slide, title) {
 }
 
 function getShareAccessFromTemplate(template) {
-  return template?.is_public || template?.visibility === 'public' ? 'link' : 'private';
+  if (template?.visibility === 'unlisted') {
+    return 'unlisted';
+  }
+
+  return template?.is_public || template?.visibility === 'public' ? 'public' : 'private';
+}
+
+function getShareSettingsFromTemplate(template) {
+  return {
+    ...DEFAULT_SHARE_SETTINGS,
+    ...(template?.share_settings ?? template?.shareSettings ?? {}),
+  };
 }
 
 function Icon({ name, size = 22 }) {
@@ -1343,6 +1621,15 @@ function Icon({ name, size = 22 }) {
         <svg {...common}>
           <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
           <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+        </svg>
+      );
+    case 'users':
+      return (
+        <svg {...common}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+          <circle cx="10" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
     case 'lock':
@@ -1530,7 +1817,105 @@ function TableGraphic({
   );
 }
 
+function normalizeAnswerValue(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function QuizGraphic({ copy, quiz, readOnly }) {
+  const config = normalizeQuizConfig(quiz, copy);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
+  const [writtenAnswer, setWrittenAnswer] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const isChoice = config.type === 'choice';
+  const correctOption = config.options[config.correctOptionIndex] ?? '';
+  const isChoiceCorrect = selectedOptionIndex === config.correctOptionIndex;
+  const isWrittenCorrect = normalizeAnswerValue(writtenAnswer) === normalizeAnswerValue(config.answer);
+  const hasResult = isSubmitted && (isChoice ? selectedOptionIndex !== null : writtenAnswer.trim());
+  const isCorrect = isChoice ? isChoiceCorrect : isWrittenCorrect;
+
+  function handleOptionClick(optionIndex, event) {
+    event.stopPropagation();
+    if (!readOnly) return;
+
+    setSelectedOptionIndex(optionIndex);
+    setIsSubmitted(true);
+  }
+
+  function handleWrittenSubmit(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!readOnly) return;
+
+    setIsSubmitted(true);
+  }
+
+  return (
+    <div className="slide-editor__quiz-slide" data-preview-interactive="true">
+      <div className="slide-editor__quiz-slide-kicker">{copy.quizSlideTitle}</div>
+      <h2>{config.question}</h2>
+      {config.hint && <p className="slide-editor__quiz-slide-hint">{config.hint}</p>}
+
+      {isChoice ? (
+        <div className="slide-editor__quiz-choice-grid">
+          {config.options.map((option, index) => {
+            const isSelected = selectedOptionIndex === index;
+            const showCorrect = isSubmitted && index === config.correctOptionIndex;
+            const showWrong = isSubmitted && isSelected && index !== config.correctOptionIndex;
+
+            return (
+              <button
+                key={`${option}-${index}`}
+                type="button"
+                className={[
+                  'slide-editor__quiz-choice',
+                  isSelected ? 'slide-editor__quiz-choice--selected' : '',
+                  showCorrect ? 'slide-editor__quiz-choice--correct' : '',
+                  showWrong ? 'slide-editor__quiz-choice--wrong' : '',
+                ].filter(Boolean).join(' ')}
+                disabled={!readOnly}
+                onClick={(event) => handleOptionClick(index, event)}
+              >
+                <span>{getQuizOptionLetter(index)}</span>
+                <strong>{option}</strong>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <form className="slide-editor__quiz-written" onSubmit={handleWrittenSubmit}>
+          <textarea
+            value={writtenAnswer}
+            disabled={!readOnly}
+            placeholder={copy.quizAnswerLabel}
+            onChange={(event) => setWrittenAnswer(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          />
+          <button type="submit" disabled={!readOnly || !writtenAnswer.trim()}>
+            {copy.quizCheckAnswer}
+          </button>
+        </form>
+      )}
+
+      {hasResult && (
+        <div
+          className={`slide-editor__quiz-result${isCorrect ? ' slide-editor__quiz-result--correct' : ' slide-editor__quiz-result--wrong'}`}
+          role="status"
+        >
+          <strong>{isCorrect ? copy.quizCorrectFeedback : copy.quizWrongFeedback}</strong>
+          {!isCorrect && (
+            <span>
+              {copy.quizAnswerLabel}: {isChoice ? correctOption : config.answer}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SlideElement({
+  copy,
   element,
   isSelected,
   onDelete,
@@ -1574,6 +1959,7 @@ function SlideElement({
     const isEditingText = event.target instanceof HTMLElement
       && (
         event.target.closest('[data-editable-text="true"]')
+        || event.target.closest('[data-editable-shape="true"]')
         || event.target.closest('[data-editable-table-cell="true"]')
       );
 
@@ -1651,9 +2037,21 @@ function SlideElement({
       {(element.type === 'shape' || element.type === 'frame') && (
         <div
           className="slide-editor__shape"
+          contentEditable={!readOnly && isSelected}
+          data-editable-shape={!readOnly && isSelected ? 'true' : undefined}
+          suppressContentEditableWarning
           style={{
             background: element.fill,
             borderColor: element.stroke,
+          }}
+          onInput={(event) => onTextChange(element.id, event.currentTarget.textContent ?? '')}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
+          onPointerDown={(event) => {
+            if (!readOnly && isSelected) {
+              event.stopPropagation();
+            }
           }}
         >
           {element.text}
@@ -1694,6 +2092,10 @@ function SlideElement({
         </div>
       )}
 
+      {element.type === 'quiz' && (
+        <QuizGraphic key={element.quiz?.id ?? element.id} copy={copy} quiz={element.quiz} readOnly={readOnly} />
+      )}
+
       {isSelected && !readOnly && (
         <>
           {['nw', 'ne', 'sw', 'se'].map((corner) => (
@@ -1714,6 +2116,7 @@ function SlideElement({
 }
 
 function SlideSurface({
+  copy,
   elements,
   onCanvasClick,
   onDelete,
@@ -1733,6 +2136,7 @@ function SlideSurface({
       {elements.map((element) => (
         <SlideElement
           key={element.id}
+          copy={copy}
           element={element}
           isSelected={element.id === selectedElementId}
           onDelete={onDelete}
@@ -1826,6 +2230,21 @@ function MiniSlideElement({ element }) {
     );
   }
 
+  if (element.type === 'quiz') {
+    const quiz = element.quiz ?? {};
+
+    return (
+      <div
+        className="slide-editor__mini-element slide-editor__mini-element--quiz"
+        style={elementStyle}
+      >
+        <strong>{quiz.question || element.text}</strong>
+        <span />
+        <span />
+      </div>
+    );
+  }
+
   return (
     <span
       className={`slide-editor__mini-element slide-editor__mini-element--${element.type}`}
@@ -1876,6 +2295,7 @@ export default function SlideEditor({
   const [selectedTool, setSelectedTool] = useState('text');
   const [activePanel, setActivePanel] = useState('ai');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGeneratedText, setAiGeneratedText] = useState('');
   const [aiError, setAiError] = useState('');
   const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
   const [imageQuery, setImageQuery] = useState('');
@@ -1894,6 +2314,9 @@ export default function SlideEditor({
   const [previewSlideId, setPreviewSlideId] = useState('');
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [shareAccess, setShareAccess] = useState(() => getShareAccessFromTemplate(initialDeck?.template));
+  const [isShareSettingsOpen, setIsShareSettingsOpen] = useState(false);
+  const [shareSettings, setShareSettings] = useState(() => getShareSettingsFromTemplate(initialDeck?.template));
+  const [isUpdatingShareSettings, setIsUpdatingShareSettings] = useState(false);
   const [isUpdatingShareAccess, setIsUpdatingShareAccess] = useState(false);
   const [shareInviteEmail, setShareInviteEmail] = useState('');
   const [shareInvitees, setShareInvitees] = useState([]);
@@ -1913,8 +2336,12 @@ export default function SlideEditor({
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkUrlDraft, setLinkUrlDraft] = useState('');
   const [linkDialogError, setLinkDialogError] = useState('');
-  const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]);
+  const [isQuizBuilderOpen, setIsQuizBuilderOpen] = useState(false);
+  const [quizForm, setQuizForm] = useState(() => createEmptyQuizForm(copy));
+  const [quizEditingIndex, setQuizEditingIndex] = useState(null);
+  const [quizBuilderError, setQuizBuilderError] = useState('');
+  const [isFinishingQuiz, setIsFinishingQuiz] = useState(false);
   const [dragState, setDragState] = useState(null);
   const [draggedSlideIndex, setDraggedSlideIndex] = useState(null);
   const canLoadDeck = Boolean(!initialDeck && templateId && currentUserId);
@@ -2022,6 +2449,7 @@ export default function SlideEditor({
           setSelectedElementId(firstSlide?.elements[0]?.id ?? '');
           setDeckTitleDraft(loadedDeck.template?.title ?? getSlideDisplayTitle(firstSlide, copy.defaultTitle));
           setShareAccess(getShareAccessFromTemplate(loadedDeck.template));
+          setShareSettings(getShareSettingsFromTemplate(loadedDeck.template));
           setError('');
         }
       })
@@ -2058,6 +2486,12 @@ export default function SlideEditor({
     }
 
     function handlePreviewKeyDown(event) {
+      const target = event.target;
+      const isInteractiveTarget = target instanceof HTMLElement
+        && target.closest('button, input, textarea, select, a, [data-preview-interactive="true"]');
+
+      if (isInteractiveTarget) return;
+
       if (event.key === 'ArrowRight' || event.key === ' ') {
         event.preventDefault();
         moveByDirection(1);
@@ -2070,12 +2504,25 @@ export default function SlideEditor({
 
       if (event.key === 'Escape') {
         setIsPreviewOpen(false);
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) {
+        setIsPreviewOpen(false);
       }
     }
 
     window.addEventListener('keydown', handlePreviewKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
-    return () => window.removeEventListener('keydown', handlePreviewKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handlePreviewKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, [editorSlides, isPreviewOpen, previewSlideIndex]);
 
   useEffect(() => {
@@ -2422,6 +2869,55 @@ export default function SlideEditor({
     setIsShareDialogOpen(true);
   }
 
+  async function handleShareSettingChange(settingKey) {
+    const previousSettings = shareSettings;
+    const nextSettings = {
+      ...shareSettings,
+      [settingKey]: !shareSettings[settingKey],
+    };
+    const deckTemplateId = deck?.template?.id ?? templateId;
+
+    setShareSettings(nextSettings);
+
+    if (!deckTemplateId || !currentUserId) {
+      setToast(formatCopy(copy.shareAccessError, { message: t('editor.missingTemplate') }));
+      return;
+    }
+
+    setIsUpdatingShareSettings(true);
+
+    try {
+      const updatedTemplate = await updateTemplateShareSettings({
+        settings: nextSettings,
+        templateId: deckTemplateId,
+        userId: currentUserId,
+      });
+
+      setDeck((currentDeck) => (
+        currentDeck
+          ? {
+              ...currentDeck,
+              template: {
+                ...currentDeck.template,
+                ...updatedTemplate,
+                share_settings: nextSettings,
+              },
+            }
+          : currentDeck
+      ));
+      setToast(
+        updatedTemplate.share_settings_persisted === false
+          ? copy.shareSettingsLocalOnly
+          : copy.shareSettingsUpdated,
+      );
+    } catch (settingsFailure) {
+      setShareSettings(previousSettings);
+      setToast(formatCopy(copy.shareAccessError, { message: settingsFailure.message }));
+    } finally {
+      setIsUpdatingShareSettings(false);
+    }
+  }
+
   async function handleShareAccessChange(event) {
     const nextAccess = event.target.value;
     const previousAccess = shareAccess;
@@ -2480,16 +2976,236 @@ export default function SlideEditor({
     setToast(copy.shareInviteAdded);
   }
 
-  function handleQuizClick() {
-    const questions = buildQuizQuestions(activeEditorSlide, deckTitleDraft || copy.defaultTitle, copy);
-
-    setQuizQuestions(questions);
-    setIsQuizOpen(true);
+  function resetQuizForm() {
+    setQuizForm(createEmptyQuizForm(copy));
+    setQuizEditingIndex(null);
+    setQuizBuilderError('');
   }
 
-  function openPreview() {
+  function handleQuizClick() {
+    resetQuizForm();
+    setIsQuizBuilderOpen(true);
+  }
+
+  function updateQuizForm(patch) {
+    setQuizForm((currentForm) => ({
+      ...currentForm,
+      ...patch,
+    }));
+  }
+
+  function updateQuizOption(optionIndex, value) {
+    setQuizForm((currentForm) => ({
+      ...currentForm,
+      options: currentForm.options.map((option, index) => (
+        index === optionIndex ? value : option
+      )),
+    }));
+  }
+
+  function addQuizOption() {
+    if (quizForm.options.length >= MAX_QUIZ_OPTIONS) {
+      setQuizBuilderError(copy.quizOptionLimit);
+      return;
+    }
+
+    setQuizForm((currentForm) => ({
+      ...currentForm,
+      options: [
+        ...currentForm.options,
+        formatCopy(copy.quizOptionPlaceholder, { letter: getQuizOptionLetter(currentForm.options.length) }),
+      ],
+    }));
+  }
+
+  function removeQuizOption(optionIndex) {
+    setQuizForm((currentForm) => {
+      if (currentForm.options.length <= 2) return currentForm;
+
+      const options = currentForm.options.filter((_, index) => index !== optionIndex);
+      const correctOptionIndex = currentForm.correctOptionIndex === optionIndex
+        ? 0
+        : currentForm.correctOptionIndex > optionIndex
+          ? currentForm.correctOptionIndex - 1
+          : currentForm.correctOptionIndex;
+
+      return {
+        ...currentForm,
+        options,
+        correctOptionIndex: clamp(correctOptionIndex, 0, options.length - 1),
+      };
+    });
+  }
+
+  function getQuizTypeLabel(type) {
+    return type === 'written' ? copy.quizTypeWritten : copy.quizTypeChoice;
+  }
+
+  function handleQuizQuestionSubmit(event) {
+    event.preventDefault();
+
+    const question = quizForm.question.trim();
+    const hint = quizForm.hint.trim();
+
+    if (!question) {
+      setQuizBuilderError(copy.quizValidationQuestion);
+      return;
+    }
+
+    if (quizForm.type === 'choice') {
+      const options = quizForm.options.map((option) => option.trim()).filter(Boolean);
+
+      if (options.length < 2) {
+        setQuizBuilderError(copy.quizValidationChoice);
+        return;
+      }
+
+      const selectedOptionValue = quizForm.options[quizForm.correctOptionIndex]?.trim();
+      const correctOptionIndex = selectedOptionValue
+        ? options.findIndex((option) => option === selectedOptionValue)
+        : 0;
+      const nextQuestion = {
+        id: quizQuestions[quizEditingIndex]?.id ?? makeId('quiz-question'),
+        type: 'choice',
+        question,
+        hint,
+        options,
+        correctOptionIndex: correctOptionIndex >= 0 ? correctOptionIndex : 0,
+        answer: options[correctOptionIndex >= 0 ? correctOptionIndex : 0],
+      };
+
+      setQuizQuestions((currentQuestions) => {
+        if (quizEditingIndex === null) return [...currentQuestions, nextQuestion];
+
+        return currentQuestions.map((item, index) => (
+          index === quizEditingIndex ? nextQuestion : item
+        ));
+      });
+      resetQuizForm();
+      return;
+    }
+
+    const answer = quizForm.answer.trim();
+
+    if (!answer) {
+      setQuizBuilderError(copy.quizValidationAnswer);
+      return;
+    }
+
+    const nextQuestion = {
+      id: quizQuestions[quizEditingIndex]?.id ?? makeId('quiz-question'),
+      type: 'written',
+      question,
+      hint,
+      options: [],
+      correctOptionIndex: 0,
+      answer,
+    };
+
+    setQuizQuestions((currentQuestions) => {
+      if (quizEditingIndex === null) return [...currentQuestions, nextQuestion];
+
+      return currentQuestions.map((item, index) => (
+        index === quizEditingIndex ? nextQuestion : item
+      ));
+    });
+    resetQuizForm();
+  }
+
+  function handleEditQuizQuestion(questionIndex) {
+    const question = quizQuestions[questionIndex];
+
+    if (!question) return;
+
+    setQuizForm({
+      type: question.type,
+      question: question.question,
+      hint: question.hint ?? '',
+      options: question.options?.length ? question.options.slice(0, MAX_QUIZ_OPTIONS) : createDefaultQuizOptions(copy),
+      correctOptionIndex: question.correctOptionIndex ?? 0,
+      answer: question.answer ?? '',
+    });
+    setQuizEditingIndex(questionIndex);
+    setQuizBuilderError('');
+  }
+
+  function handleDeleteQuizQuestion(questionIndex) {
+    setQuizQuestions((currentQuestions) => currentQuestions.filter((_, index) => index !== questionIndex));
+
+    if (quizEditingIndex === questionIndex) {
+      resetQuizForm();
+    } else if (quizEditingIndex !== null && quizEditingIndex > questionIndex) {
+      setQuizEditingIndex(quizEditingIndex - 1);
+    }
+  }
+
+  async function handleFinishQuiz() {
+    if (!quizQuestions.length) {
+      setQuizBuilderError(copy.quizNoQuestions);
+      return;
+    }
+
+    const quizSlides = buildQuizSlides(quizQuestions, copy);
+    const activeIndex = editorSlides.findIndex((slide) => slide.id === activeSlideId);
+    const insertIndex = activeIndex >= 0 ? activeIndex + 1 : editorSlides.length;
+    const nextSlides = [
+      ...editorSlides.slice(0, insertIndex),
+      ...quizSlides,
+      ...editorSlides.slice(insertIndex),
+    ].map((slide, index) => ({
+      ...slide,
+      position: index + 1,
+    }));
+    const firstInsertedSlide = nextSlides[insertIndex] ?? nextSlides[0];
+    const deckTemplateId = deck?.template?.id ?? templateId;
+    const normalizedTitle = deckTitleDraft.trim()
+      || getSlideDisplayTitle(activeEditorSlide, deck?.template?.title ?? copy.defaultTitle);
+
+    setEditorSlides(nextSlides);
+    setActiveSlideId(firstInsertedSlide?.id ?? activeSlideId);
+    setSelectedElementId('');
+    setIsQuizBuilderOpen(false);
+    setQuizQuestions([]);
+    resetQuizForm();
+    setToast(formatCopy(copy.quizInserted, { count: quizSlides.length }));
+
+    if (!deckTemplateId || !currentUserId) return;
+
+    setIsFinishingQuiz(true);
+
+    try {
+      const savedDeck = await saveDeckForEditor({
+        templateId: deckTemplateId,
+        userId: currentUserId,
+        title: normalizedTitle,
+        slides: nextSlides,
+      });
+      const nextEditableSlides = buildEditableSlides(savedDeck.slides, savedDeck.template, copy);
+      const nextActiveSlide = nextEditableSlides.find((slide) => slide.position === firstInsertedSlide?.position)
+        ?? nextEditableSlides[0];
+
+      setDeck(savedDeck);
+      setDeckTitleDraft(savedDeck.template?.title ?? normalizedTitle);
+      setEditorSlides(nextEditableSlides);
+      setActiveSlideId(nextActiveSlide?.id ?? '');
+      setSelectedElementId('');
+    } catch (saveFailure) {
+      setToast(formatCopy(copy.saveError, { message: saveFailure.message }));
+    } finally {
+      setIsFinishingQuiz(false);
+    }
+  }
+
+  async function openPreview() {
     setPreviewSlideId(activeEditorSlide?.id ?? editorSlides[0]?.id ?? '');
     setIsPreviewOpen(true);
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen error
+    }
   }
 
   function movePreviewSlide(direction) {
@@ -2581,32 +3297,11 @@ export default function SlideEditor({
     setIsGeneratingAiDraft(true);
 
     try {
-      const generatedDeck = await generateSlideDraftWithGemini({
+      const generatedText = await generateAiTextWithGemini({
         deckTitle: deckTitleDraft,
         prompt,
       });
-      const generatedSlides = buildAiDraftSlides(generatedDeck, copy);
-      const firstSlide = generatedSlides[0];
-      const firstTextElement = firstSlide?.elements.find((element) => element.type === 'text');
-
-      setEditorSlides((currentSlides) => {
-        const activeIndex = currentSlides.findIndex((slide) => slide.id === activeSlideId);
-        const insertIndex = activeIndex >= 0 ? activeIndex + 1 : currentSlides.length;
-        const nextSlides = [
-          ...currentSlides.slice(0, insertIndex),
-          ...generatedSlides,
-          ...currentSlides.slice(insertIndex),
-        ];
-
-        return nextSlides.map((slide, index) => ({
-          ...slide,
-          position: index + 1,
-        }));
-      });
-      setActiveSlideId(firstSlide?.id ?? activeSlideId);
-      setSelectedElementId(firstTextElement?.id ?? firstSlide?.elements[0]?.id ?? '');
-      setDeckTitleDraft((currentTitle) => currentTitle || generatedDeck.deckTitle || copy.defaultTitle);
-      setAiPrompt('');
+      setAiGeneratedText(generatedText);
       setToast(copy.aiGenerated ?? 'AI draft generated');
     } catch (generateError) {
       setAiError(formatCopy(
@@ -2762,6 +3457,193 @@ export default function SlideEditor({
           <Icon name="arrow-left" size={18} />
           {t('editor.backHome')}
         </button>
+      </section>
+    );
+  }
+
+  if (isQuizBuilderOpen) {
+    return (
+      <section className="slide-editor slide-editor--quiz-builder" aria-label={copy.quizBuilderTitle}>
+        <div className="slide-editor__quiz-page">
+          <header className="slide-editor__quiz-page-header">
+            <h1>{copy.quizBuilderTitle}</h1>
+            <button type="button" onClick={() => setIsQuizBuilderOpen(false)}>
+              {copy.quizBack}
+            </button>
+          </header>
+
+          <div className="slide-editor__quiz-main">
+            <form className="slide-editor__quiz-form" onSubmit={handleQuizQuestionSubmit}>
+              <div className="slide-editor__quiz-form-grid">
+                <label className="slide-editor__quiz-field">
+                  <span>{copy.quizTypeLabel}</span>
+                  <select
+                    value={quizForm.type}
+                    onChange={(event) => updateQuizForm({
+                      type: event.target.value,
+                      correctOptionIndex: 0,
+                    })}
+                  >
+                    {QUIZ_TYPE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {copy[option.copyKey]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="slide-editor__quiz-question-cluster">
+                  <label className="slide-editor__quiz-field slide-editor__quiz-field--question">
+                    <span>{copy.quizQuestionLabel}</span>
+                    <textarea
+                      value={quizForm.question}
+                      maxLength={100}
+                      placeholder={copy.quizQuestionPlaceholder}
+                      onChange={(event) => updateQuizForm({ question: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                    />
+                  </label>
+                  <div className="slide-editor__quiz-target-preview" aria-label={copy.quizTargetSlidePreview}>
+                    <SlideMiniature slide={activeEditorSlide ?? { elements: [] }} />
+                    <span>{copy.quizTargetSlidePreview}</span>
+                  </div>
+                </div>
+              </div>
+
+              <label className="slide-editor__quiz-field">
+                <span>{copy.quizHintLabel}</span>
+                <input
+                  type="text"
+                  value={quizForm.hint}
+                  placeholder={copy.quizHintPlaceholder}
+                  onChange={(event) => updateQuizForm({ hint: event.target.value })}
+                />
+              </label>
+
+              {quizForm.type === 'choice' ? (
+                <div className="slide-editor__quiz-options">
+                  {quizForm.options.map((option, index) => (
+                    <label key={`${getQuizOptionLetter(index)}-${index}`} className="slide-editor__quiz-option-row">
+                      <span>{getQuizOptionLetter(index)}</span>
+                      <input
+                        type="text"
+                        value={option}
+                        placeholder={formatCopy(copy.quizOptionPlaceholder, { letter: getQuizOptionLetter(index) })}
+                        onChange={(event) => updateQuizOption(index, event.target.value)}
+                      />
+                      <label className="slide-editor__quiz-correct">
+                        <input
+                          type="radio"
+                          name="quiz-correct-option"
+                          checked={quizForm.correctOptionIndex === index}
+                          onChange={() => updateQuizForm({ correctOptionIndex: index })}
+                        />
+                        {copy.quizCorrectLabel}
+                      </label>
+                      <button
+                        type="button"
+                        className="slide-editor__quiz-option-delete"
+                        disabled={quizForm.options.length <= 2}
+                        onClick={() => removeQuizOption(index)}
+                        aria-label={copy.quizDeleteQuestion}
+                      >
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <label className="slide-editor__quiz-field">
+                  <span>{copy.quizAnswerLabel}</span>
+                  <textarea
+                    value={quizForm.answer}
+                    placeholder={copy.quizAnswerLabel}
+                    onChange={(event) => updateQuizForm({ answer: event.target.value })}
+                  />
+                </label>
+              )}
+
+              {quizBuilderError && (
+                <p className="slide-editor__quiz-builder-error" role="alert">{quizBuilderError}</p>
+              )}
+
+              <div className="slide-editor__quiz-form-actions">
+                {quizForm.type === 'choice' && (
+                  <button
+                    type="button"
+                    className="slide-editor__secondary-submit"
+                    disabled={quizForm.options.length >= MAX_QUIZ_OPTIONS}
+                    onClick={addQuizOption}
+                  >
+                    <Icon name="plus" size={17} />
+                    {copy.quizAddOption}
+                  </button>
+                )}
+                <button type="submit" className="slide-editor__save-submit">
+                  <Icon name="save" size={18} />
+                  {quizEditingIndex === null ? copy.quizSaveQuestion : copy.quizUpdateQuestion}
+                </button>
+              </div>
+            </form>
+
+            <aside className="slide-editor__quiz-summary">
+              <h2>{copy.quizOverviewTitle}</h2>
+              <strong>{formatCopy(copy.quizQuestionCount, { count: quizQuestions.length })}</strong>
+            </aside>
+          </div>
+
+          <section className="slide-editor__quiz-question-list">
+            <div className="slide-editor__quiz-list-header">
+              <h2>{copy.quizQuestionListTitle}</h2>
+              <button
+                type="button"
+                className="slide-editor__save-submit"
+                disabled={!quizQuestions.length || isFinishingQuiz}
+                onClick={handleFinishQuiz}
+              >
+                <Icon name="quiz" size={18} />
+                {isFinishingQuiz ? copy.quizFinishing : copy.quizFinish}
+              </button>
+            </div>
+
+            {quizQuestions.length ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>{copy.quizColumnNumber}</th>
+                    <th>{copy.quizColumnQuestion}</th>
+                    <th>{copy.quizColumnType}</th>
+                    <th>{copy.quizColumnAction}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quizQuestions.map((question, index) => (
+                    <tr key={question.id}>
+                      <td>{index + 1}</td>
+                      <td>{question.question}</td>
+                      <td>{getQuizTypeLabel(question.type)}</td>
+                      <td>
+                        <button type="button" onClick={() => handleEditQuizQuestion(index)}>
+                          {copy.quizEditQuestion}
+                        </button>
+                        <button type="button" onClick={() => handleDeleteQuizQuestion(index)}>
+                          {copy.quizDeleteQuestion}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>{copy.quizNoQuestions}</p>
+            )}
+          </section>
+        </div>
       </section>
     );
   }
@@ -2983,6 +3865,7 @@ export default function SlideEditor({
 
           <div className="slide-editor__canvas-shell" ref={canvasRef}>
             <SlideSurface
+              copy={copy}
               elements={activeEditorSlide?.elements ?? []}
               onCanvasClick={() => setSelectedElementId('')}
               onDelete={deleteSelectedElement}
@@ -3078,6 +3961,11 @@ export default function SlideEditor({
                 </div>
                 {aiError && (
                   <p className="slide-editor__ai-error" role="alert">{aiError}</p>
+                )}
+                {aiGeneratedText && (
+                  <div className="slide-editor__ai-result">
+                    <ReactMarkdown>{aiGeneratedText}</ReactMarkdown>
+                  </div>
                 )}
               </section>
             )}
@@ -3342,12 +4230,45 @@ export default function SlideEditor({
               <button
                 type="button"
                 className="slide-editor__share-settings"
-                onClick={() => setIsShareDialogOpen(false)}
+                aria-expanded={isShareSettingsOpen}
+                onClick={() => setIsShareSettingsOpen((isOpen) => !isOpen)}
               >
                 <Icon name="settings" size={20} />
+                {copy.shareSettings}
+              </button>
+              <button
+                type="button"
+                className="slide-editor__share-close"
+                onClick={() => setIsShareDialogOpen(false)}
+              >
                 {copy.closeShare}
               </button>
             </div>
+
+            {isShareSettingsOpen && (
+              <section className="slide-editor__share-advanced" aria-label={copy.shareAdvancedTitle}>
+                <div>
+                  <strong>{copy.shareAdvancedTitle}</strong>
+                  <p>{copy.shareAdvancedDescription}</p>
+                </div>
+                {[
+                  ['allowDownload', copy.shareAllowDownload],
+                  ['allowCopy', copy.shareAllowCopy],
+                  ['allowEdit', copy.shareAllowEdit],
+                  ['allowReshare', copy.shareAllowReshare],
+                ].map(([settingKey, settingLabel]) => (
+                  <label key={settingKey} className="slide-editor__share-toggle">
+                    <span>{settingLabel}</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(shareSettings[settingKey])}
+                      disabled={isUpdatingShareSettings}
+                      onChange={() => handleShareSettingChange(settingKey)}
+                    />
+                  </label>
+                ))}
+              </section>
+            )}
 
             <form className="slide-editor__share-add-user" onSubmit={handleAddShareInvite}>
               <input
@@ -3382,15 +4303,23 @@ export default function SlideEditor({
               <h2>{copy.shareAccessTitle}</h2>
               <label>
                 <span className="slide-editor__share-access-icon">
-                  <Icon name={shareAccess === 'link' ? 'link' : 'lock'} size={22} />
+                  <Icon
+                    name={shareAccess === 'public'
+                      ? 'link'
+                      : shareAccess === 'unlisted'
+                        ? 'users'
+                        : 'lock'}
+                    size={22}
+                  />
                 </span>
                 <select
                   value={shareAccess}
                   onChange={handleShareAccessChange}
                   disabled={isUpdatingShareAccess}
                 >
+                  <option value="public">{copy.sharePublicAccess}</option>
                   <option value="private">{copy.sharePrivateAccess}</option>
-                  <option value="link">{copy.shareLinkAccess}</option>
+                  <option value="unlisted">{copy.shareInvitedAccess}</option>
                 </select>
               </label>
             </div>
@@ -3407,38 +4336,22 @@ export default function SlideEditor({
         </div>
       )}
 
-      {isQuizOpen && (
-        <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.quizDialogTitle}>
-          <div className="slide-editor__quiz-dialog">
-            <div className="slide-editor__modal-header">
-              <strong>{copy.quizDialogTitle}</strong>
-              <button type="button" onClick={() => setIsQuizOpen(false)}>
-                {copy.closeQuiz}
-              </button>
-            </div>
-            <div className="slide-editor__quiz-list">
-              {quizQuestions.map((item, index) => (
-                <article key={`${item.question}-${index}`} className="slide-editor__quiz-item">
-                  <small>{copy.quizQuestionLabel} {index + 1}</small>
-                  <strong>{item.question}</strong>
-                  <span>{copy.quizAnswerLabel}: {item.answer}</span>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {isPreviewOpen && (
         <div className="slide-editor__modal" role="dialog" aria-modal="true" aria-label={copy.previewTitle}>
           <div className="slide-editor__modal-content slide-editor__modal-content--preview">
             <div className="slide-editor__modal-header">
               <strong>{copy.previewTitle} {previewSlideIndex + 1}/{editorSlides.length}</strong>
-              <button type="button" onClick={() => setIsPreviewOpen(false)}>
+              <button type="button" onClick={() => {
+                setIsPreviewOpen(false);
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+              }}>
                 {copy.closePreview}
               </button>
             </div>
             <SlideSurface
+              copy={copy}
               elements={previewSlide?.elements ?? []}
               onCanvasClick={() => {}}
               onDelete={() => {}}

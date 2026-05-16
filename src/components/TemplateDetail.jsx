@@ -552,6 +552,16 @@ export default function TemplateDetail({
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) {
+        setIsPreviewOpen(false);
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
   const [isUsing, setIsUsing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [savedDeckId, setSavedDeckId] = useState('');
@@ -750,7 +760,16 @@ export default function TemplateDetail({
               <span>{isUsing ? copy.using : copy.useTemplate}</span>
               <DetailIcon name="plus" />
             </button>
-            <button type="button" className="template-detail__preview-btn" onClick={() => setIsPreviewOpen(true)}>
+            <button type="button" className="template-detail__preview-btn" onClick={async () => {
+              setIsPreviewOpen(true);
+              try {
+                if (!document.fullscreenElement) {
+                  await document.documentElement.requestFullscreen();
+                }
+              } catch (err) {
+                // Ignore fullscreen error
+              }
+            }}>
               {copy.preview}
             </button>
           </div>
@@ -809,7 +828,12 @@ export default function TemplateDetail({
           <div className="template-detail__modal-content">
             <div className="template-detail__modal-header">
               <strong>{activeSlide.title}</strong>
-              <button type="button" onClick={() => setIsPreviewOpen(false)} aria-label={copy.closePreview}>
+              <button type="button" onClick={() => {
+                setIsPreviewOpen(false);
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+              }} aria-label={copy.closePreview}>
                 <DetailIcon name="close" />
               </button>
             </div>

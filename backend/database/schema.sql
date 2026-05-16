@@ -20,6 +20,12 @@ create table if not exists public.slide_templates (
   thumbnail_url text,
   slide_count integer not null default 0 check (slide_count >= 0),
   visibility text not null default 'private' check (visibility in ('private', 'public', 'unlisted')),
+  share_settings jsonb not null default '{
+    "allowCopy": true,
+    "allowEdit": false,
+    "allowDownload": false,
+    "allowReshare": false
+  }'::jsonb,
   status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
   rating_average numeric(3, 2) not null default 0 check (rating_average >= 0 and rating_average <= 5),
   view_count integer not null default 0 check (view_count >= 0),
@@ -57,6 +63,38 @@ alter table if exists public.templates
 
 alter table if exists public.presentations
   add column if not exists last_opened_at timestamptz;
+
+alter table if exists public.templates
+  add column if not exists visibility text not null default 'private'
+  check (visibility in ('private', 'public', 'unlisted'));
+
+alter table if exists public.presentations
+  add column if not exists visibility text not null default 'private'
+  check (visibility in ('private', 'public', 'unlisted'));
+
+alter table if exists public.slide_templates
+  add column if not exists share_settings jsonb not null default '{
+    "allowCopy": true,
+    "allowEdit": false,
+    "allowDownload": false,
+    "allowReshare": false
+  }'::jsonb;
+
+alter table if exists public.templates
+  add column if not exists share_settings jsonb not null default '{
+    "allowCopy": true,
+    "allowEdit": false,
+    "allowDownload": false,
+    "allowReshare": false
+  }'::jsonb;
+
+alter table if exists public.presentations
+  add column if not exists share_settings jsonb not null default '{
+    "allowCopy": true,
+    "allowEdit": false,
+    "allowDownload": false,
+    "allowReshare": false
+  }'::jsonb;
 
 do $$
 begin
