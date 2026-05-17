@@ -189,11 +189,9 @@ export default function App() {
 
     try {
       const deck = await createBlankDeck({ userId: user.id, language });
-      recordTemplateOpened({ templateId: deck.template.id, userId: user.id }).catch(() => {});
-
       setActiveDeck(deck);
-      setActiveTemplateId(deck.template.id);
-      setEditorHash(deck.template.id);
+      setActiveTemplateId('');
+      clearEditorHash();
       setView('editor');
     } catch (error) {
       setCreateSlideError(t('home.createNewSlideError', { message: error.message }));
@@ -276,6 +274,7 @@ export default function App() {
         {view === 'home' && (
           <Home
             currentUserId={user?.id}
+            currentUserEmail={user?.email ?? ''}
             isLoggedIn={isLoggedIn}
             submittedSearchQuery={submittedSearchQuery}
             isSearchActive={isSearchActive}
@@ -290,6 +289,7 @@ export default function App() {
         {view === 'my-slides' && (
           <MySlides
             currentUserId={user?.id}
+            currentUserEmail={user?.email ?? ''}
             onOpenTemplate={handleOpenSavedTemplate}
           />
         )}
@@ -299,6 +299,7 @@ export default function App() {
             templateId={detailTemplate?.id ?? activeTemplateId}
             initialTemplate={detailTemplate}
             currentUserId={user?.id}
+            currentUserEmail={user?.email ?? ''}
             onBack={handleBackFromTemplateDetail}
             onCreatedDeck={handleCreatedDeckFromDetail}
             onEditTemplate={handleOpenSavedTemplate}
@@ -312,6 +313,7 @@ export default function App() {
             templateId={activeTemplateId}
             initialDeck={activeDeck}
             currentUserId={user?.id}
+            currentUserEmail={user?.email ?? ''}
             onBackHome={handleBackHomeFromEditor}
           />
         )}

@@ -1,8 +1,3 @@
-/* ══════════════════════════════════════════════════════════
-   MySlides – Personal Library  (資料共有 / Thư viện cá nhân)
-   ══════════════════════════════════════════════════════════ */
-
-/* ─── Page container ─── */
 .ms-page {
   max-width: 1100px;
   margin: 0 auto;
@@ -10,7 +5,6 @@
   font-family: 'Inter', 'Noto Sans JP', sans-serif;
 }
 
-/* ─── Page header row ─── */
 .ms-page__header {
   display: flex;
   align-items: center;
@@ -28,7 +22,6 @@
   letter-spacing: -0.01em;
 }
 
-/* ─── Sort bar ─── */
 .ms-sort-bar {
   display: flex;
   align-items: center;
@@ -76,7 +69,6 @@
   font-size: 0.8rem;
 }
 
-/* ─── Alert / status / empty ─── */
 .ms-alert {
   margin-bottom: 16px;
   padding: 11px 14px;
@@ -122,7 +114,6 @@
   font-weight: 600;
 }
 
-/* ─── Cards grid ─── */
 .ms-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -130,7 +121,6 @@
   margin-bottom: 36px;
 }
 
-/* ─── Individual card ─── */
 .ms-card {
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
@@ -147,7 +137,6 @@
   transform: translateY(-2px);
 }
 
-/* thumbnail button */
 .ms-card__thumb {
   display: block;
   width: 100%;
@@ -173,7 +162,6 @@
   display: block;
 }
 
-/* fallback thumbnail grid (mimics slide mini-grid) */
 .ms-card__thumb-fallback {
   width: 100%;
   height: 100%;
@@ -228,7 +216,6 @@
   color: #9ca3af;
 }
 
-/* card body */
 .ms-card__body {
   padding: 14px 14px 16px;
   display: flex;
@@ -245,7 +232,6 @@
   line-height: 1.35;
 }
 
-/* ─── Permission badge ─── */
 .ms-badge {
   display: inline-flex;
   align-items: center;
@@ -280,7 +266,6 @@
   opacity: 0.8;
 }
 
-/* ─── Manage link button ─── */
 .ms-card__manage-btn {
   width: 100%;
   padding: 9px 0;
@@ -301,7 +286,6 @@
   background: #eff6ff;
 }
 
-/* ─── Access table section ─── */
 .ms-access-section {
   margin-top: 4px;
 }
@@ -372,7 +356,6 @@
   justify-content: center;
 }
 
-/* ─── Table action buttons ─── */
 .ms-table-btn {
   padding: 5px 14px;
   border-radius: 6px;
@@ -409,7 +392,373 @@
   border-color: #dc2626;
 }
 
-/* ─── Responsive ─── */
+.ms-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.ms-modal__card {
+  width: min(460px, 100%);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+  padding: 24px;
+}
+
+.ms-modal__title {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.ms-modal__text {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ms-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.ms-modal__btn {
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.ms-modal__btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.ms-modal__btn--ghost {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+}
+
+.ms-modal__btn--ghost:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.ms-modal__btn--danger {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+}
+
+.ms-modal__btn--danger:hover:not(:disabled) {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
+.ms-share-dialog {
+  display: grid;
+  width: min(560px, 92vw);
+  max-height: calc(100vh - 48px);
+  gap: 18px;
+  padding: 22px;
+  overflow: auto;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+}
+
+.ms-share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ms-share-header div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 22px;
+}
+
+.ms-share-header strong {
+  color: #111827;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.ms-share-header span {
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.ms-share-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ms-share-settings,
+.ms-share-close {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ms-share-settings {
+  padding: 0 12px;
+}
+
+.ms-share-settings[aria-expanded='true'] {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.ms-share-close {
+  padding: 0 14px;
+}
+
+.ms-share-settings:hover,
+.ms-share-close:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.ms-share-advanced {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.ms-share-advanced strong {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.ms-share-advanced p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.ms-share-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  color: #1e293b;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.ms-share-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.ms-share-add-user {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.ms-share-add-user input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.ms-share-add-user input:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.ms-share-add-user button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ms-share-add-user button:disabled,
+.ms-share-access select:disabled,
+.ms-share-toggle input:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
+.ms-share-user-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ms-share-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 900;
+}
+
+.ms-share-user-row strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.ms-share-user-row small {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.ms-share-user-row button {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.ms-share-invitees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ms-share-invitees span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.ms-share-access {
+  display: grid;
+  gap: 12px;
+}
+
+.ms-share-access h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.ms-share-access label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.ms-share-access-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff;
+  color: #2563eb;
+}
+
+.ms-share-access select {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.ms-share-message {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.ms-share-copy {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ms-share-copy:hover {
+  background: #1d4ed8;
+}
+
 @media (max-width: 900px) {
   .ms-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -432,5 +781,17 @@
 
   .ms-sort-bar {
     flex-wrap: wrap;
+  }
+
+  .ms-modal {
+    padding: 16px;
+  }
+
+  .ms-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .ms-modal__btn {
+    width: 100%;
   }
 }

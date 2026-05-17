@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
-import { listRecentlyOpenedTemplates } from '../services/slideCreationService.js';
+import {
+  listRecentlyOpenedTemplates,
+  listSearchableTemplates,
+} from '../services/slideCreationService.js';
 import { filterTemplates, sortTemplates } from '../utils/templateSearch';
 import SlidePreviewThumbnail from './SlidePreviewThumbnail.jsx';
 import './Home.css';
@@ -171,6 +174,8 @@ const searchTemplates = [
   },
 ];
 
+void searchTemplates;
+
 const recommendedTemplates = [
   {
     id: 'recommended-1',
@@ -235,6 +240,41 @@ function getRecentTemplateCard(template, language) {
   };
 }
 
+function getLibraryTemplateCard(template, language) {
+  const rating = Number(template.rating_average ?? template.rating ?? 0);
+  const viewCount = Number(template.view_count ?? template.viewCount ?? 0);
+
+  return {
+    id: template.id,
+    title: template.title,
+    description: template.description ?? '',
+    subject: template.subject ?? template.topic ?? '',
+    topic: template.subject ?? template.topic ?? '',
+    category: template.subject ?? template.category ?? '',
+    firstSlide: template.first_slide,
+    image: template.thumbnail_url,
+    date: formatDate(template.updated_at ?? template.created_at, language),
+    sortDate: template.updated_at ?? template.created_at ?? '',
+    slides: template.slide_count ?? template.page_count ?? 0,
+    rating: Number.isFinite(rating) ? rating : 0,
+    viewCount: Number.isFinite(viewCount) ? viewCount : 0,
+    template,
+    views: '',
+  };
+}
+
+function getSearchLoadingLabel(language) {
+  return language === 'vi'
+    ? 'Đang tải kết quả tìm kiếm...'
+    : '検索結果を読み込み中...';
+}
+
+function getSearchErrorMessage(language, message) {
+  return language === 'vi'
+    ? `Không thể tải kết quả tìm kiếm: ${message}`
+    : `検索結果を読み込めませんでした: ${message}`;
+}
+
 function SlideCard({ template, title, firstSlide, image, date, slides, views, t, onOpenTemplate }) {
   return (
     <button type="button" className="template-card" onClick={() => onOpenTemplate?.(template)}>
@@ -273,6 +313,7 @@ function SlideCard({ template, title, firstSlide, image, date, slides, views, t,
 
 export default function Home({
   currentUserId,
+  currentUserEmail,
   isLoggedIn,
   submittedSearchQuery,
   isSearchActive,
@@ -288,6 +329,9 @@ export default function Home({
   const [recentTemplates, setRecentTemplates] = useState([]);
   const [recentError, setRecentError] = useState('');
   const [isRecentLoading, setIsRecentLoading] = useState(false);
+  const [libraryTemplates, setLibraryTemplates] = useState([]);
+  const [libraryError, setLibraryError] = useState('');
+  const [isLibraryLoading, setIsLibraryLoading] = useState(false);
   const hasSearchQuery = submittedSearchQuery.length > 0;
   const showSearchResults = isSearchActive && hasSearchQuery;
   const showGuestLanding = !isLoggedIn && !showSearchResults;
@@ -339,17 +383,74 @@ export default function Home({
     [language, recentTemplates],
   );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve()
+      .then(() => {
+        if (!isMounted) return [];
+
+        if (!showSearchResults) {
+          setLibraryTemplates([]);
+          setLibraryError('');
+          setIsLibraryLoading(false);
+          return [];
+        }
+
+        setIsLibraryLoading(true);
+        setLibraryError('');
+        return listSearchableTemplates(currentUserId, currentUserEmail);
+      })
+      .then((templates) => {
+        if (isMounted) {
+          setLibraryTemplates(templates);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setLibraryTemplates([]);
+          setLibraryError(getSearchErrorMessage(language, error.message));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLibraryLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUserEmail, currentUserId, language, showSearchResults]);
+
+  const librarySlides = useMemo(
+    () => libraryTemplates.map((template) => getLibraryTemplateCard(template, language)),
+    [language, libraryTemplates],
+  );
+
   const templates = useMemo(() => {
     if (showGuestLanding) {
       return popularSlides;
     }
 
+    if (showLoggedInDashboard) {
+      return [];
+    }
+
     const filteredTemplates = hasSearchQuery
-      ? filterTemplates(searchTemplates, submittedSearchQuery)
-      : searchTemplates;
+      ? filterTemplates(librarySlides, submittedSearchQuery)
+      : librarySlides;
 
     return sortTemplates(filteredTemplates, activeSort, language);
-  }, [activeSort, hasSearchQuery, language, showGuestLanding, submittedSearchQuery]);
+  }, [
+    activeSort,
+    hasSearchQuery,
+    language,
+    librarySlides,
+    showGuestLanding,
+    showLoggedInDashboard,
+    submittedSearchQuery,
+  ]);
 
   const sortOptions = useMemo(
     () =>
@@ -439,8 +540,12 @@ export default function Home({
       ) : showLibraryHeader ? (
         <div className="home-header">
           <div className="home-header-left">
-            <h1 className="home-title">{t('home.templateTitle')}</h1>
-            <h2 className="home-subtitle">{t('home.templateSubtitle')}</h2>
+            <h1 className="home-title">
+              {hasSearchQuery 
+                ? t('home.searchResults', { query: submittedSearchQuery }) 
+                : t('home.templateTitle')}
+            </h1>
+            {!hasSearchQuery && <h2 className="home-subtitle">{t('home.templateSubtitle')}</h2>}
           </div>
 
           <div className="home-header-right">
@@ -461,13 +566,22 @@ export default function Home({
         </div>
       ) : null}
 
-      {!showLoggedInDashboard && (
+      {showSearchResults && isLibraryLoading && (
+        <div className="home-status">{getSearchLoadingLabel(language)}</div>
+      )}
+
+      {showSearchResults && libraryError && !isLibraryLoading && (
+        <div className="home-create-error" role="alert">{libraryError}</div>
+      )}
+
+      {!showLoggedInDashboard && (!showSearchResults || (!isLibraryLoading && !libraryError)) && (
         <div className="home-grid">
           {templates.map((template) => (
             <SlideCard
               key={template.id}
-              template={template}
+              template={template.template ?? template}
               title={template.title}
+              firstSlide={template.firstSlide}
               image={template.image}
               date={template.date}
               slides={template.slides}

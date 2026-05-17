@@ -43,6 +43,7 @@ export const translations = {
       resultCount: '全{{count}}件が見つかりました',
       slides: '{{count}}スライド',
       lastUpdated: '最終更新: {{date}}',
+      searchResults: '「{{query}}」の検索結果',
     },
     auth: {
       loginTitle: 'ログイン',
@@ -146,6 +147,7 @@ export const translations = {
       resultCount: 'Tìm thấy {{count}} mục',
       slides: '{{count}} slide',
       lastUpdated: 'Cập nhật lần cuối: {{date}}',
+      searchResults: 'Kết quả tìm kiếm cho "{{query}}"',
     },
     auth: {
       loginTitle: 'Đăng nhập',

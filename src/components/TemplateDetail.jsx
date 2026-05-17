@@ -537,6 +537,7 @@ function TemplateSlidePreview({ slide, title, scale = 1 }) {
 export default function TemplateDetail({
   templateId,
   initialTemplate,
+  currentUserEmail,
   currentUserId,
   onBack,
   onCreatedDeck,
@@ -577,7 +578,7 @@ export default function TemplateDetail({
       };
     }
 
-    getDeckForEditor(templateId, currentUserId)
+    getDeckForEditor(templateId, currentUserId, currentUserEmail)
       .then((deck) => {
         if (isMounted) setLoadedDeck(deck);
       })
@@ -588,7 +589,7 @@ export default function TemplateDetail({
     return () => {
       isMounted = false;
     };
-  }, [copy.loadError, currentUserId, shouldLoadSavedDeck, templateId]);
+  }, [copy.loadError, currentUserEmail, currentUserId, shouldLoadSavedDeck, templateId]);
 
   const detail = useMemo(() => {
     if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language);

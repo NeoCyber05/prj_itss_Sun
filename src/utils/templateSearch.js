@@ -6,7 +6,11 @@ function getSearchableValues(item) {
   return [
     item.title,
     item.author,
+    item.description,
     item.topic,
+    item.subject,
+    item.category,
+    item.firstSlide?.title,
     ...(item.tags ?? []),
   ];
 }
@@ -34,7 +38,9 @@ export function sortTemplates(templates, sortId, locale = 'ja') {
 
   switch (sortId) {
     case 'created':
-      return items.sort((left, right) => parseDate(right.date) - parseDate(left.date));
+      return items.sort(
+        (left, right) => parseDate(right.sortDate ?? right.date) - parseDate(left.sortDate ?? left.date),
+      );
     case 'rating':
       return items.sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0));
     case 'views':

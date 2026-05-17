@@ -69,7 +69,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password,
     });
@@ -78,7 +78,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     if (signInError) {
       setError(signInError.message);
     } else {
-      onLoginSuccess({ email: email.trim() });
+      onLoginSuccess(data.user);
     }
   }
 

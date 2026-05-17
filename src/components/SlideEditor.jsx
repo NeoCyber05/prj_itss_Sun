@@ -360,10 +360,12 @@ const TEXT_FONT_FAMILIES = [
 
 const DEFAULT_TEXT_FONT_FAMILY = TEXT_FONT_FAMILIES[0].value;
 const DEFAULT_SHARE_SETTINGS = {
+  accessMode: 'private',
   allowDownload: false,
   allowCopy: true,
   allowEdit: false,
   allowReshare: false,
+  invitedEmails: [],
 };
 const MIN_TABLE_SIZE = 1;
 const MAX_TABLE_SIZE = 20;
@@ -1520,18 +1522,49 @@ function applyTitleToSlide(slide, title) {
 }
 
 function getShareAccessFromTemplate(template) {
+  const accessMode = template?.share_settings?.accessMode ?? template?.shareSettings?.accessMode;
+
   if (template?.visibility === 'unlisted') {
     return 'unlisted';
+  }
+
+  if (accessMode === 'unlisted' || accessMode === 'public' || accessMode === 'private') {
+    return accessMode;
   }
 
   return template?.is_public || template?.visibility === 'public' ? 'public' : 'private';
 }
 
+function normalizeInviteEmail(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function normalizeInviteEmails(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return [...new Set(values
+    .map(normalizeInviteEmail)
+    .filter(Boolean))];
+}
+
 function getShareSettingsFromTemplate(template) {
+  const nextShareAccess = getShareAccessFromTemplate(template);
+  const templateShareSettings = template?.share_settings ?? template?.shareSettings ?? {};
+
   return {
     ...DEFAULT_SHARE_SETTINGS,
-    ...(template?.share_settings ?? template?.shareSettings ?? {}),
+    ...templateShareSettings,
+    accessMode: templateShareSettings.accessMode ?? nextShareAccess,
+    invitedEmails: normalizeInviteEmails(
+      templateShareSettings.invitedEmails ?? templateShareSettings.invited_emails,
+    ),
   };
+}
+
+function getShareInviteesFromTemplate(template) {
+  return getShareSettingsFromTemplate(template).invitedEmails;
 }
 
 function Icon({ name, size = 22 }) {
@@ -2122,6 +2155,7 @@ function SlideSurface({
   onDelete,
   onDragStart,
   onResizeStart,
+  surfaceRef,
   onTableCellChange,
   onSelect,
   onTextChange,
@@ -2130,7 +2164,9 @@ function SlideSurface({
 }) {
   return (
     <div
+      ref={surfaceRef}
       className={`slide-editor__canvas${readOnly ? ' slide-editor__canvas--preview' : ''}`}
+      tabIndex={readOnly ? undefined : 0}
       onClick={onCanvasClick}
     >
       {elements.map((element) => (
@@ -2272,12 +2308,14 @@ function SlideMiniature({ slide }) {
 export default function SlideEditor({
   templateId,
   initialDeck,
+  currentUserEmail,
   currentUserId,
   onBackHome,
 }) {
   const { language, t } = useLanguage();
   const copy = useMemo(() => getEditorCopy(language), [language]);
   const canvasRef = useRef(null);
+  const canvasSurfaceRef = useRef(null);
   const imageFileInputRef = useRef(null);
   const textColorInputRef = useRef(null);
   const underlineColorInputRef = useRef(null);
@@ -2319,7 +2357,7 @@ export default function SlideEditor({
   const [isUpdatingShareSettings, setIsUpdatingShareSettings] = useState(false);
   const [isUpdatingShareAccess, setIsUpdatingShareAccess] = useState(false);
   const [shareInviteEmail, setShareInviteEmail] = useState('');
-  const [shareInvitees, setShareInvitees] = useState([]);
+  const [shareInvitees, setShareInvitees] = useState(() => getShareInviteesFromTemplate(initialDeck?.template));
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
   const [tableDialogData, setTableDialogData] = useState({
     columns: String(DEFAULT_TABLE_COLUMNS),
@@ -2366,6 +2404,12 @@ export default function SlideEditor({
     () => (imageResults.length ? imageResults : buildPlaceholderImageResults('', copy)),
     [copy, imageResults],
   );
+
+  const focusCanvasSurface = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      canvasSurfaceRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
 
   const updateElement = useCallback((elementId, patch) => {
     setEditorSlides((currentSlides) => currentSlides.map((slide) => {
@@ -2437,7 +2481,7 @@ export default function SlideEditor({
       };
     }
 
-    getDeckForEditor(templateId, currentUserId)
+    getDeckForEditor(templateId, currentUserId, currentUserEmail)
       .then((loadedDeck) => {
         if (isMounted) {
           const nextSlides = buildEditableSlides(loadedDeck.slides, loadedDeck.template, copy);
@@ -2450,6 +2494,7 @@ export default function SlideEditor({
           setDeckTitleDraft(loadedDeck.template?.title ?? getSlideDisplayTitle(firstSlide, copy.defaultTitle));
           setShareAccess(getShareAccessFromTemplate(loadedDeck.template));
           setShareSettings(getShareSettingsFromTemplate(loadedDeck.template));
+          setShareInvitees(getShareInviteesFromTemplate(loadedDeck.template));
           setError('');
         }
       })
@@ -2462,7 +2507,7 @@ export default function SlideEditor({
     return () => {
       isMounted = false;
     };
-  }, [canLoadDeck, copy, currentUserId, t, templateId]);
+  }, [canLoadDeck, copy, currentUserEmail, currentUserId, t, templateId]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -2524,6 +2569,37 @@ export default function SlideEditor({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, [editorSlides, isPreviewOpen, previewSlideIndex]);
+
+  useEffect(() => {
+    if (!selectedElement || isPreviewOpen || isShareDialogOpen) {
+      return undefined;
+    }
+
+    function handleSelectedElementKeyDown(event) {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') {
+        return;
+      }
+
+      const target = event.target;
+      const isEditableTarget = target instanceof HTMLElement
+        && target.closest(
+          'input, textarea, select, button, [contenteditable="true"], [data-editable-text="true"], [data-editable-shape="true"], [data-editable-table-cell="true"]',
+        );
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteSelectedElement();
+    }
+
+    window.addEventListener('keydown', handleSelectedElementKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleSelectedElementKeyDown);
+    };
+  }, [deleteSelectedElement, isPreviewOpen, isShareDialogOpen, selectedElement]);
 
   useEffect(() => {
     if (!dragState) return undefined;
@@ -2610,6 +2686,7 @@ export default function SlideEditor({
         elements: [...slide.elements, element],
       };
     }));
+    focusCanvasSurface();
   }
 
   function insertImageIntoSelectionOrAdd(imagePatch) {
@@ -2620,6 +2697,7 @@ export default function SlideEditor({
       });
       setSelectedTool('image');
       setSelectedElementId(selectedElement.id);
+      focusCanvasSurface();
       return;
     }
 
@@ -2869,17 +2947,26 @@ export default function SlideEditor({
     setIsShareDialogOpen(true);
   }
 
+  function buildShareSettingsPayload(overrides = {}) {
+    return {
+      ...shareSettings,
+      accessMode: shareAccess,
+      invitedEmails: shareInvitees,
+      ...overrides,
+    };
+  }
+
   async function handleShareSettingChange(settingKey) {
     const previousSettings = shareSettings;
-    const nextSettings = {
-      ...shareSettings,
+    const nextSettings = buildShareSettingsPayload({
       [settingKey]: !shareSettings[settingKey],
-    };
+    });
     const deckTemplateId = deck?.template?.id ?? templateId;
 
     setShareSettings(nextSettings);
 
     if (!deckTemplateId || !currentUserId) {
+      setShareSettings(previousSettings);
       setToast(formatCopy(copy.shareAccessError, { message: t('editor.missingTemplate') }));
       return;
     }
@@ -2921,11 +3008,16 @@ export default function SlideEditor({
   async function handleShareAccessChange(event) {
     const nextAccess = event.target.value;
     const previousAccess = shareAccess;
+    const previousSettings = shareSettings;
     const deckTemplateId = deck?.template?.id ?? templateId;
+    const nextSettings = buildShareSettingsPayload({ accessMode: nextAccess });
 
     setShareAccess(nextAccess);
+    setShareSettings(nextSettings);
 
     if (!deckTemplateId || !currentUserId) {
+      setShareAccess(previousAccess);
+      setShareSettings(previousSettings);
       setToast(formatCopy(copy.shareAccessError, { message: t('editor.missingTemplate') }));
       return;
     }
@@ -2935,6 +3027,7 @@ export default function SlideEditor({
     try {
       const updatedTemplate = await updateTemplateShareAccess({
         accessMode: nextAccess,
+        settings: nextSettings,
         templateId: deckTemplateId,
         userId: currentUserId,
       });
@@ -2946,6 +3039,7 @@ export default function SlideEditor({
               template: {
                 ...currentDeck.template,
                 ...updatedTemplate,
+                share_settings: nextSettings,
               },
             }
           : currentDeck
@@ -2953,27 +3047,71 @@ export default function SlideEditor({
       setToast(copy.shareAccessUpdated);
     } catch (shareFailure) {
       setShareAccess(previousAccess);
+      setShareSettings(previousSettings);
       setToast(formatCopy(copy.shareAccessError, { message: shareFailure.message }));
     } finally {
       setIsUpdatingShareAccess(false);
     }
   }
 
-  function handleAddShareInvite(event) {
+  async function handleAddShareInvite(event) {
     event.preventDefault();
 
-    const email = shareInviteEmail.trim();
+    const email = normalizeInviteEmail(shareInviteEmail);
+    const deckTemplateId = deck?.template?.id ?? templateId;
 
     if (!email) {
       setToast(copy.shareInviteEmpty);
       return;
     }
 
-    setShareInvitees((currentInvitees) => (
-      currentInvitees.includes(email) ? currentInvitees : [...currentInvitees, email]
-    ));
-    setShareInviteEmail('');
-    setToast(copy.shareInviteAdded);
+    const nextInvitees = shareInvitees.includes(email)
+      ? shareInvitees
+      : [...shareInvitees, email];
+    const previousInvitees = shareInvitees;
+    const previousSettings = shareSettings;
+    const nextSettings = buildShareSettingsPayload({ invitedEmails: nextInvitees });
+
+    setShareInvitees(nextInvitees);
+    setShareSettings(nextSettings);
+
+    if (!deckTemplateId || !currentUserId) {
+      setShareInvitees(previousInvitees);
+      setShareSettings(previousSettings);
+      setToast(formatCopy(copy.shareAccessError, { message: t('editor.missingTemplate') }));
+      return;
+    }
+
+    setIsUpdatingShareSettings(true);
+
+    try {
+      const updatedTemplate = await updateTemplateShareSettings({
+        settings: nextSettings,
+        templateId: deckTemplateId,
+        userId: currentUserId,
+      });
+
+      setDeck((currentDeck) => (
+        currentDeck
+          ? {
+              ...currentDeck,
+              template: {
+                ...currentDeck.template,
+                ...updatedTemplate,
+                share_settings: nextSettings,
+              },
+            }
+          : currentDeck
+      ));
+      setShareInviteEmail('');
+      setToast(copy.shareInviteAdded);
+    } catch (inviteFailure) {
+      setShareInvitees(previousInvitees);
+      setShareSettings(previousSettings);
+      setToast(formatCopy(copy.shareAccessError, { message: inviteFailure.message }));
+    } finally {
+      setIsUpdatingShareSettings(false);
+    }
   }
 
   function resetQuizForm() {
@@ -3381,7 +3519,7 @@ export default function SlideEditor({
 
     const deckTemplateId = deck?.template?.id ?? templateId;
 
-    if (!deckTemplateId || !currentUserId) {
+    if (!currentUserId) {
       setSaveError(formatCopy(copy.saveError, { message: t('editor.missingTemplate') }));
       return;
     }
@@ -3871,6 +4009,7 @@ export default function SlideEditor({
               onDelete={deleteSelectedElement}
               onDragStart={handleDragStart}
               onResizeStart={handleResizeStart}
+              surfaceRef={canvasSurfaceRef}
               onSelect={setSelectedElementId}
               onTableCellChange={updateTableCell}
               onTextChange={(elementId, text) => updateElement(elementId, { text })}
