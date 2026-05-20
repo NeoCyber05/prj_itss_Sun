@@ -10,7 +10,7 @@ import './AuthCard.css';
  * @param {function} props.onLoginSuccess – callback after successful login
  * @param {function} props.onSwitchToRegister – callback to show register form
  */
-export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
+export default function LoginForm({ onLoginSuccess, onSwitchToRegister, onForgotPassword }) {
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,24 +82,8 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     }
   }
 
-  async function handleForgotPassword() {
-    setError('');
-    if (!email.trim()) {
-      setError(t('auth.errors.emailRequired'));
-      return;
-    }
-    
-    setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
-    });
-    setLoading(false);
-
-    if (resetError) {
-      setError(resetError.message);
-    } else {
-      alert("Đã gửi link khôi phục! Vui lòng kiểm tra email của bạn.");
-    }
+  function handleForgotPassword() {
+    onForgotPassword(email.trim());
   }
 
   return (

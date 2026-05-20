@@ -361,6 +361,28 @@
   background: #ffffff;
 }
 
+.slide-editor__element-delete {
+  position: absolute;
+  top: -28px;
+  right: -1px;
+  z-index: 3;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #dc2626;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+}
+
+.slide-editor__element-delete:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
 .slide-editor__resize-handle--nw {
   top: -6px;
   left: -6px;

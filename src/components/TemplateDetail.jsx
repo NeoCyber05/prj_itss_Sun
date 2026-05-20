@@ -15,7 +15,7 @@ const COPY = {
     loading: 'テンプレート詳細を読み込み中...',
     loadError: 'テンプレート詳細を読み込めませんでした: {{message}}',
     useTemplate: 'このテンプレートを使用',
-    preview: 'スライドプレビュー',
+    preview: '評価',
     download: 'ダウンロード',
     save: 'マイプロジェクトに保存',
     saving: '保存中...',
@@ -42,7 +42,7 @@ const COPY = {
     loading: 'Đang tải chi tiết template...',
     loadError: 'Không thể tải chi tiết template: {{message}}',
     useTemplate: 'Sử dụng template này',
-    preview: 'Xem trước slide',
+    preview: 'Đánh giá',
     download: 'Tải xuống',
     save: 'Lưu vào dự án của tôi',
     saving: 'Đang lưu...',
@@ -778,7 +778,6 @@ export default function TemplateDetail({
 
         <aside className="template-detail__info">
           <h2>{detail.title}</h2>
-          <p>{detail.description}</p>
 
           <ul>
             <li>{formatCopy(copy.slideCount, { count: detail.slide_count })}</li>

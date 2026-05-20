@@ -14,18 +14,17 @@ export default function Header({
   isLoggedIn,
   user,
   onLogout,
+  onOpenProfile,
   searchQuery,
   onSearchQueryChange,
   onSearchSubmit,
   searchPlaceholder,
 }) {
   const { language, setLanguage, t } = useLanguage();
-  const isAuthView = currentView === 'login' || currentView === 'register';
+  const isAuthView = ['login', 'register', 'forgot-password', 'reset-password'].includes(currentView);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef(null);
   const userMetadata = user?.user_metadata ?? {};
-  const userName = userMetadata.full_name || userMetadata.name || user?.email || t('header.defaultUserName');
-  const userEmail = user?.email || '';
   const avatarUrl = userMetadata.avatar_url || userMetadata.picture;
 
   useEffect(() => {
@@ -51,14 +50,8 @@ export default function Header({
   }, []);
 
   function handleUserInfoClick() {
-    const lines = [t('header.userInfoTitle'), `${t('header.nameLabel')}: ${userName}`];
-
-    if (userEmail) {
-      lines.push(`${t('header.emailLabel')}: ${userEmail}`);
-    }
-
-    alert(lines.join('\n'));
     setIsAvatarMenuOpen(false);
+    onOpenProfile();
   }
 
   function handleLogoutClick() {

@@ -2131,6 +2131,23 @@ function SlideElement({
 
       {isSelected && !readOnly && (
         <>
+          <button
+            type="button"
+            className="slide-editor__element-delete"
+            title={copy.deleteSelection}
+            aria-label={copy.deleteSelection}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onDelete();
+            }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <Icon name="trash" size={13} />
+          </button>
           {['nw', 'ne', 'sw', 'se'].map((corner) => (
             <span
               key={corner}

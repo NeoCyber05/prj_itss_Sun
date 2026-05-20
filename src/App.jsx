@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import Header from './components/Header';
+import ForgotPasswordForm from './components/ForgotPasswordForm';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Home from './components/Home';
 import MySlides from './components/MySlides';
+import Profile from './components/Profile';
+import ResetPasswordForm from './components/ResetPasswordForm';
 import SlideEditor from './components/SlideEditor';
 import TemplateDetail from './components/TemplateDetail';
 import { useLanguage } from './i18n/LanguageContext.jsx';
@@ -11,6 +14,7 @@ import { supabase } from './supabaseClient';
 import { createBlankDeck, recordTemplateOpened } from './services/slideCreationService.js';
 
 const EDITOR_HASH_PREFIX = '#editor=';
+const RESET_PASSWORD_HASH = '#reset-password';
 const PERSISTED_TEMPLATE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getEditorTemplateIdFromHash() {
@@ -31,6 +35,16 @@ function clearEditorHash() {
   }
 }
 
+function isResetPasswordHash() {
+  return window.location.hash === RESET_PASSWORD_HASH;
+}
+
+function clearResetPasswordHash() {
+  if (isResetPasswordHash()) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
 function isPersistedTemplateId(value) {
   return PERSISTED_TEMPLATE_ID_PATTERN.test(String(value ?? ''));
 }
@@ -42,10 +56,12 @@ function isPersistedTemplateId(value) {
 export default function App() {
   const { language, t } = useLanguage();
   const initialEditorTemplateId = getEditorTemplateIdFromHash();
-  const [view, setView] = useState(initialEditorTemplateId ? 'editor' : 'home');
+  const [view, setView] = useState(isResetPasswordHash() ? 'reset-password' : initialEditorTemplateId ? 'editor' : 'home');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [hasRecoverySession, setHasRecoverySession] = useState(isResetPasswordHash());
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -60,13 +76,19 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    function syncSession(session) {
+    function syncSession(session, event = '') {
       if (!isMounted) return;
 
       const hasSession = Boolean(session);
       setIsLoggedIn(hasSession);
       setUser(session?.user ?? null);
       setIsAuthReady(true);
+
+      if (event === 'PASSWORD_RECOVERY' || isResetPasswordHash()) {
+        setHasRecoverySession(hasSession);
+        setView('reset-password');
+        return;
+      }
 
       if (hasSession) {
         const templateId = getEditorTemplateIdFromHash();
@@ -90,6 +112,7 @@ export default function App() {
 
         setActiveDeck(null);
         setDetailTemplate(null);
+        setHasRecoverySession(false);
       }
     }
 
@@ -103,8 +126,8 @@ export default function App() {
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        syncSession(session);
+      (event, session) => {
+        syncSession(session, event);
       },
     );
 
@@ -120,6 +143,7 @@ export default function App() {
     setIsAuthReady(true);
     setIsLoggedIn(true);
     setUser(demoUser);
+    setHasRecoverySession(false);
 
     if (templateId) {
       setActiveTemplateId(templateId);
@@ -146,14 +170,16 @@ export default function App() {
     setActiveTemplateId('');
     setDetailTemplate(null);
     setCreateSlideError('');
+    setHasRecoverySession(false);
     clearEditorHash();
+    clearResetPasswordHash();
     setView('home');
   }
 
   function handleViewChange(nextView) {
     setView(nextView);
 
-    if (nextView === 'home' || nextView === 'my-slides') {
+    if (nextView === 'home' || nextView === 'my-slides' || nextView === 'profile' || nextView === 'login') {
       setSearchQuery('');
       setSubmittedSearchQuery('');
       setIsSearchActive(false);
@@ -162,7 +188,25 @@ export default function App() {
       setDetailTemplate(null);
       setCreateSlideError('');
       clearEditorHash();
+      clearResetPasswordHash();
     }
+  }
+
+  function handleForgotPassword(initialEmail = '') {
+    setForgotPasswordEmail(initialEmail);
+    setView('forgot-password');
+    clearEditorHash();
+    clearResetPasswordHash();
+  }
+
+  function handleBackToLogin() {
+    setForgotPasswordEmail('');
+    setHasRecoverySession(false);
+    setIsLoggedIn(false);
+    setUser(null);
+    clearEditorHash();
+    clearResetPasswordHash();
+    setView('login');
   }
 
   function handleSearchSubmit() {
@@ -255,6 +299,36 @@ export default function App() {
     setHomeRefreshKey((key) => key + 1);
   }
 
+  function handleOpenTemplateFromMySlides(template) {
+    const nextTemplate = typeof template === 'string' ? { id: template } : template;
+
+    if (user?.id && isPersistedTemplateId(nextTemplate?.id)) {
+      recordTemplateOpened({ templateId: nextTemplate.id, userId: user.id }).catch(() => {});
+    }
+
+    setActiveDeck(null);
+    setActiveTemplateId(nextTemplate?.id ?? '');
+    setDetailTemplate(nextTemplate ?? null);
+    setDetailReturnView('my-slides');
+    clearEditorHash();
+    setView('template-detail');
+  }
+
+  function handleOpenRecentTemplate(template) {
+    const nextTemplate = typeof template === 'string' ? { id: template } : template;
+
+    if (user?.id && isPersistedTemplateId(nextTemplate?.id)) {
+      recordTemplateOpened({ templateId: nextTemplate.id, userId: user.id }).catch(() => {});
+    }
+
+    setActiveDeck(null);
+    setActiveTemplateId(nextTemplate?.id ?? '');
+    setDetailTemplate(nextTemplate ?? null);
+    setDetailReturnView('home');
+    clearEditorHash();
+    setView('template-detail');
+  }
+
   return (
     <>
       <Header
@@ -264,13 +338,14 @@ export default function App() {
         isLoggedIn={isLoggedIn}
         user={user}
         onLogout={handleLogout}
+        onOpenProfile={() => handleViewChange('profile')}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         onSearchSubmit={handleSearchSubmit}
         searchPlaceholder={t('header.searchPlaceholder')}
       />
 
-      <main className={`main${view === 'login' || view === 'register' ? ' main--auth' : ''}`} id="mainContent">
+      <main className={`main${['login', 'register', 'forgot-password', 'reset-password'].includes(view) ? ' main--auth' : ''}`} id="mainContent">
         {view === 'home' && (
           <Home
             currentUserId={user?.id}
@@ -280,7 +355,7 @@ export default function App() {
             isSearchActive={isSearchActive}
             onCreateNewSlide={handleCreateNewSlide}
             onOpenTemplate={handleOpenTemplateDetail}
-            onOpenRecentTemplate={handleOpenSavedTemplate}
+            onOpenRecentTemplate={handleOpenRecentTemplate}
             isCreatingSlide={isCreatingSlide}
             createSlideError={createSlideError}
             refreshKey={homeRefreshKey}
@@ -290,7 +365,14 @@ export default function App() {
           <MySlides
             currentUserId={user?.id}
             currentUserEmail={user?.email ?? ''}
-            onOpenTemplate={handleOpenSavedTemplate}
+            onOpenTemplate={handleOpenTemplateFromMySlides}
+          />
+        )}
+        {view === 'profile' && (
+          <Profile
+            user={user}
+            onCancel={() => handleViewChange('home')}
+            onUserUpdated={setUser}
           />
         )}
         {view === 'template-detail' && (
@@ -322,12 +404,25 @@ export default function App() {
             key="login"
             onLoginSuccess={handleLoginSuccess}
             onSwitchToRegister={() => setView('register')}
+            onForgotPassword={handleForgotPassword}
           />
         )}
         {view === 'register' && (
           <RegisterForm
             key="register"
             onSwitchToLogin={() => setView('login')}
+          />
+        )}
+        {view === 'forgot-password' && (
+          <ForgotPasswordForm
+            initialEmail={forgotPasswordEmail}
+            onBackToLogin={handleBackToLogin}
+          />
+        )}
+        {view === 'reset-password' && (
+          <ResetPasswordForm
+            hasRecoverySession={hasRecoverySession}
+            onBackToLogin={handleBackToLogin}
           />
         )}
       </main>

@@ -491,7 +491,7 @@ export default function Home({
                     slides={slide.slides}
                     views={slide.views}
                     t={t}
-                    onOpenTemplate={(template) => onOpenRecentTemplate?.(template.id)}
+                    onOpenTemplate={(template) => onOpenRecentTemplate?.(template)}
                   />
                 ))}
               </div>

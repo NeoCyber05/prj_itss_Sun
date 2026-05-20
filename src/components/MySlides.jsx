@@ -591,7 +591,7 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
                   <button
                     type="button"
                     className="ms-card__thumb"
-                    onClick={() => onOpenTemplate(template.id)}
+                    onClick={() => onOpenTemplate(template)}
                     aria-label={`${copy.open} ${title}`}
                   >
                     <TemplatePreview template={template} title={title} />
@@ -653,7 +653,7 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
                           <button
                             type="button"
                             className="ms-table-btn ms-table-btn--edit"
-                            onClick={() => onOpenTemplate(template.id)}
+                            onClick={() => onOpenTemplate(template)}
                           >
                             {copy.open}
                           </button>
