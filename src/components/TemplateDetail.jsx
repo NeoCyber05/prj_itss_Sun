@@ -5,6 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext.jsx';
 import {
   createDeckFromTemplateDetail,
   getDeckForEditor,
+  updateTemplateRating,
 } from '../services/slideCreationService.js';
 import './TemplateDetail.css';
 
@@ -35,6 +36,13 @@ const COPY = {
     closePreview: '閉じる',
     nextSlide: '次のスライド',
     previousSlide: '前のスライド',
+    ratingDialogTitle: 'スライドテンプレートの評価',
+    ratingTarget: '評価対象',
+    ratingBad: '悪い',
+    ratingExcellent: '素晴らしい',
+    ratingSubmit: '評価を送信',
+    ratingCancel: 'キャンセル',
+    ratingSubmitted: '評価を送信しました',
   },
   vi: {
     pageTitle: 'CHI TIẾT MẪU SLIDE',
@@ -62,6 +70,13 @@ const COPY = {
     closePreview: 'Đóng',
     nextSlide: 'Slide sau',
     previousSlide: 'Slide trước',
+    ratingDialogTitle: 'Đánh giá mẫu slide',
+    ratingTarget: 'Đánh giá',
+    ratingBad: 'Tệ',
+    ratingExcellent: 'Tuyệt vời',
+    ratingSubmit: 'Gửi đánh giá',
+    ratingCancel: 'Hủy',
+    ratingSubmitted: 'Đã gửi đánh giá',
   },
 };
 
@@ -292,6 +307,7 @@ function buildDetailFromDeck(deck, copy, language) {
     image: template?.thumbnail_url ?? slides[0]?.thumbnail_url ?? null,
     language: language === 'vi' ? 'Tiếng Việt' : '日本語',
     slide_count: template?.slide_count ?? template?.page_count ?? slides.length,
+    rating: Number(template?.rating_average ?? template?.rating ?? 0),
     slides: slides.length ? slides : buildCatalogSlides({ ...template, title, slides: 5 }, copy),
     isPersisted: Boolean(template?.id),
   };
@@ -313,6 +329,7 @@ function buildDetailFromTemplate(template, copy, language) {
     image: template?.image ?? template?.thumbnail_url ?? slides[0]?.thumbnail_url ?? null,
     language: template?.language || (language === 'vi' ? 'Tiếng Việt' : '日本語'),
     slide_count: template?.slide_count ?? template?.slides ?? slides.length,
+    rating: Number(template?.rating_average ?? template?.rating ?? 0),
     slides,
     isPersisted: Boolean(isPersistedUuid(template?.id)),
   };
@@ -372,6 +389,49 @@ function DetailIcon({ name }) {
   }
 }
 
+function StarRating({ rating = 0, maxStars = 5 }) {
+  const safeRating = Number.isFinite(rating) ? Math.min(Math.max(rating, 0), maxStars) : 0;
+  const fullStars = Math.floor(safeRating);
+  const hasHalf = safeRating - fullStars >= 0.5;
+
+  return (
+    <div className="template-detail__rating" aria-label={`Rating: ${safeRating} out of ${maxStars} stars`}>
+      {Array.from({ length: maxStars }, (_, index) => {
+        const starIndex = index + 1;
+        const isFull = starIndex <= fullStars;
+        const isHalf = !isFull && starIndex === fullStars + 1 && hasHalf;
+
+        return (
+          <svg
+            key={index}
+            className={`template-detail__star${isFull ? ' template-detail__star--full' : ''}${isHalf ? ' template-detail__star--half' : ''}`}
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+          >
+            <defs>
+              {isHalf && (
+                <linearGradient id={`half-${index}`}>
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="50%" stopColor="#d1d5db" />
+                </linearGradient>
+              )}
+            </defs>
+            <path
+              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+              fill={isFull ? '#f59e0b' : isHalf ? `url(#half-${index})` : '#d1d5db'}
+              stroke="#f59e0b"
+              strokeWidth="1"
+            />
+          </svg>
+        );
+      })}
+      <span className="template-detail__rating-value">{safeRating.toFixed(1)}</span>
+    </div>
+  );
+}
+
+// eslint-disable-next-line no-unused-vars
 function buildExportText(detail) {
   let text = `${detail.title}\n`;
   text += `=========================================\n\n`;
@@ -563,10 +623,48 @@ export default function TemplateDetail({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    if (!isPreviewOpen) return undefined;
+
+    function handlePreviewKeyDown(event) {
+      const target = event.target;
+      const isInteractiveTarget = target instanceof HTMLElement
+        && target.closest('button, input, textarea, select, a');
+
+      if (isInteractiveTarget) return;
+
+      if (event.key === 'ArrowRight' || event.key === ' ') {
+        event.preventDefault();
+        goToSlide(activeSlideIndex + 1);
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goToSlide(activeSlideIndex - 1);
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsPreviewOpen(false);
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handlePreviewKeyDown);
+    return () => document.removeEventListener('keydown', handlePreviewKeyDown);
+  }, [isPreviewOpen, activeSlideIndex, detail.slides.length]);
+
   const [isUsing, setIsUsing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [savedDeckId, setSavedDeckId] = useState('');
   const [toast, setToast] = useState('');
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [localRating, setLocalRating] = useState(null);
   const shouldLoadSavedDeck = Boolean(isPersistedUuid(templateId) && currentUserId);
 
   useEffect(() => {
@@ -596,8 +694,14 @@ export default function TemplateDetail({
     return buildDetailFromTemplate(initialTemplate, copy, language);
   }, [copy, initialTemplate, language, loadedDeck]);
 
+  const ratingToShow = localRating !== null ? localRating : detail.rating;
+
   const activeSlide = detail.slides[activeSlideIndex] ?? detail.slides[0];
-  const canEditExisting = Boolean(loadedDeck?.template?.id);
+  const canEditExisting = Boolean(
+    loadedDeck?.template?.id
+    && currentUserId
+    && loadedDeck.template.owner_id === currentUserId,
+  );
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -683,6 +787,39 @@ export default function TemplateDetail({
     }
   }
 
+  async function handleSubmitRating() {
+    if (ratingValue === 0) return;
+
+    setIsSubmittingRating(true);
+
+    try {
+      const isPersisted = isPersistedUuid(detail.id);
+      let newRating = ratingValue;
+
+      if (isPersisted) {
+        const updatedTemplate = await updateTemplateRating(detail.id, ratingValue);
+        newRating = Number(updatedTemplate?.rating_average ?? ratingValue);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      setLocalRating(newRating);
+      setToast(copy.ratingSubmitted);
+      setIsRatingOpen(false);
+      setRatingValue(0);
+    } catch (error) {
+      setToast('Đánh giá thất bại: ' + error.message);
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  }
+
+  function closeRatingDialog() {
+    if (isSubmittingRating) return;
+    setIsRatingOpen(false);
+    setRatingValue(0);
+  }
+
   async function handleDownload() {
     if (!exportRef.current || isDownloading) return;
     setIsDownloading(true);
@@ -761,15 +898,9 @@ export default function TemplateDetail({
               <span>{isUsing ? copy.using : copy.useTemplate}</span>
               <DetailIcon name="plus" />
             </button>
-            <button type="button" className="template-detail__preview-btn" onClick={async () => {
-              setIsPreviewOpen(true);
-              try {
-                if (!document.fullscreenElement) {
-                  await document.documentElement.requestFullscreen();
-                }
-              } catch (err) {
-                // Ignore fullscreen error
-              }
+            <button type="button" className="template-detail__preview-btn" onClick={() => {
+              setIsRatingOpen(true);
+              setRatingValue(0);
             }}>
               {copy.preview}
             </button>
@@ -777,7 +908,10 @@ export default function TemplateDetail({
         </div>
 
         <aside className="template-detail__info">
-          <h2>{detail.title}</h2>
+          <div className="template-detail__info-header">
+            <h2>{detail.title}</h2>
+            <StarRating rating={ratingToShow} />
+          </div>
 
           <ul>
             <li>{formatCopy(copy.slideCount, { count: detail.slide_count })}</li>
@@ -822,6 +956,72 @@ export default function TemplateDetail({
       </div>
 
       {toast && <div className="template-detail__toast" role="status">{toast}</div>}
+
+      {isRatingOpen && (
+        <div className="template-detail__modal template-detail__modal--rating" role="dialog" aria-modal="true" aria-label={copy.ratingDialogTitle}>
+          <div className="template-detail__rating-dialog">
+            <h2 className="template-detail__rating-dialog__title">{copy.ratingDialogTitle}</h2>
+
+            <div className="template-detail__rating-dialog__target">
+              <div className="template-detail__rating-dialog__thumb">
+                <TemplateSlidePreview slide={detail.slides[0]} title={detail.title} scale={0.3} />
+              </div>
+              <div className="template-detail__rating-dialog__target-info">
+                <strong>{copy.ratingTarget}:</strong>
+                <span>{detail.title}</span>
+              </div>
+            </div>
+
+            <div className="template-detail__rating-dialog__stars">
+              <span className="template-detail__rating-dialog__label-min">{copy.ratingBad}</span>
+              <div className="template-detail__rating-dialog__star-group">
+                {Array.from({ length: 5 }, (_, index) => {
+                  const starValue = index + 1;
+                  const isActive = starValue <= ratingValue;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      className={`template-detail__rating-dialog__star${isActive ? ' template-detail__rating-dialog__star--active' : ''}`}
+                      onClick={() => setRatingValue(starValue)}
+                      aria-label={`${starValue} sao`}
+                    >
+                      <svg viewBox="0 0 24 24" width="48" height="48">
+                        <path
+                          d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                          fill={isActive ? '#f59e0b' : '#d1d5db'}
+                          stroke={isActive ? '#f59e0b' : '#9ca3af'}
+                          strokeWidth="1"
+                        />
+                      </svg>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="template-detail__rating-dialog__label-max">{copy.ratingExcellent}</span>
+            </div>
+
+            <div className="template-detail__rating-dialog__actions">
+              <button
+                type="button"
+                className="template-detail__rating-dialog__btn template-detail__rating-dialog__btn--submit"
+                onClick={handleSubmitRating}
+                disabled={ratingValue === 0 || isSubmittingRating}
+              >
+                {isSubmittingRating ? '...' : copy.ratingSubmit}
+              </button>
+              <button
+                type="button"
+                className="template-detail__rating-dialog__btn template-detail__rating-dialog__btn--cancel"
+                onClick={closeRatingDialog}
+                disabled={isSubmittingRating}
+              >
+                {copy.ratingCancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPreviewOpen && (
         <div className="template-detail__modal" role="dialog" aria-modal="true" aria-label={copy.preview}>

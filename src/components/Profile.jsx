@@ -23,6 +23,7 @@ const PROFILE_COPY = {
     passwordTodo: 'パスワード変更画面は未実装です。',
     notificationsTodo: '通知設定画面は未実装です。',
     invalidImage: '画像ファイルを選択してください。',
+    invalidPhone: '電話番号の形式が無効です。',
     defaultName: 'ユーザー',
   },
   vi: {
@@ -44,6 +45,7 @@ const PROFILE_COPY = {
     passwordTodo: 'Màn hình đổi mật khẩu chưa được triển khai.',
     notificationsTodo: 'Màn hình cài đặt thông báo chưa được triển khai.',
     invalidImage: 'Vui lòng chọn tệp ảnh.',
+    invalidPhone: 'Số điện thoại không hợp lệ.',
     defaultName: 'Người dùng',
   },
 };
@@ -232,6 +234,12 @@ export default function Profile({ user, onCancel, onUserUpdated }) {
     event.target.value = '';
   }
 
+  const PHONE_REGEX = /^[\d\s+\-()]{7,20}$/;
+
+  function isValidPhone(value) {
+    return !value || PHONE_REGEX.test(value);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -240,6 +248,11 @@ export default function Profile({ user, onCancel, onUserUpdated }) {
     const nextDisplayName = formData.displayName.trim();
     const nextEmail = formData.email.trim();
     const nextPhone = formData.phone.trim();
+
+    if (!isValidPhone(nextPhone)) {
+      setError(copy.invalidPhone);
+      return;
+    }
 
     setIsSaving(true);
     setStatus('');
@@ -462,7 +475,8 @@ export default function Profile({ user, onCancel, onUserUpdated }) {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(event) => updateField('email', event.target.value)}
+                  readOnly
+                  tabIndex={-1}
                 />
               </label>
 
@@ -471,6 +485,8 @@ export default function Profile({ user, onCancel, onUserUpdated }) {
                 <input
                   type="tel"
                   value={formData.phone}
+                  pattern="[\d\s+\-()]{7,20}"
+                  title={copy.invalidPhone}
                   onChange={(event) => updateField('phone', event.target.value)}
                 />
               </label>
@@ -510,9 +526,6 @@ export default function Profile({ user, onCancel, onUserUpdated }) {
               onClick={handleChangePasswordClick}
             >
               {copy.changePassword}
-            </button>
-            <button type="button" onClick={() => setStatus(copy.notificationsTodo)}>
-              {copy.notifications}
             </button>
           </div>
           {(passwordError || passwordStatus) && (

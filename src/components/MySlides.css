@@ -286,6 +286,33 @@
   background: #eff6ff;
 }
 
+.ms-card__delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 0;
+  border: 1.5px solid #fca5a5;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ms-card__delete-btn:hover:not(:disabled) {
+  border-color: #dc2626;
+  background: #fff7f7;
+}
+
+.ms-card__delete-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .ms-access-section {
   margin-top: 4px;
 }
@@ -390,6 +417,25 @@
 .ms-table-btn--revoke:hover:not(:disabled) {
   background: #fff7f7;
   border-color: #dc2626;
+}
+
+.ms-table-btn--delete {
+  background: #fff;
+  color: #b91c1c;
+  border: 1.5px solid #fca5a5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ms-table-btn--delete:hover:not(:disabled) {
+  background: #fff7f7;
+  border-color: #dc2626;
+}
+
+.ms-table-btn--delete:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .ms-modal {

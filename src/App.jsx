@@ -49,6 +49,25 @@ function isPersistedTemplateId(value) {
   return PERSISTED_TEMPLATE_ID_PATTERN.test(String(value ?? ''));
 }
 
+function isFetchFailure(error) {
+  return error?.name === 'TypeError'
+    || String(error?.message ?? '').includes('Failed to fetch');
+}
+
+function clearLocalSupabaseSession() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (/^sb-.+-auth-token/.test(key)) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Ignore storage errors; UI state is still cleared below.
+  }
+}
+
 /**
  * App – Root component.
  * Manages view state (home ↔ login ↔ register).
@@ -153,14 +172,7 @@ export default function App() {
     }
   }
 
-  async function handleLogout() {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      alert(t('app.logoutFailed', { message: error.message }));
-      return;
-    }
-
+  function resetAuthenticatedState() {
     setIsLoggedIn(false);
     setUser(null);
     setSearchQuery('');
@@ -174,6 +186,25 @@ export default function App() {
     clearEditorHash();
     clearResetPasswordHash();
     setView('home');
+  }
+
+  async function handleLogout() {
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      if (!isFetchFailure(error)) {
+        alert(t('app.logoutFailed', { message: error.message }));
+        return;
+      }
+
+      clearLocalSupabaseSession();
+    }
+
+    resetAuthenticatedState();
   }
 
   function handleViewChange(nextView) {

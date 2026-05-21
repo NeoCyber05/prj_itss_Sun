@@ -28,6 +28,7 @@ create table if not exists public.slide_templates (
   }'::jsonb,
   status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
   rating_average numeric(3, 2) not null default 0 check (rating_average >= 0 and rating_average <= 5),
+  rating_count integer not null default 0 check (rating_count >= 0),
   view_count integer not null default 0 check (view_count >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -67,6 +68,14 @@ alter table if exists public.presentations
 alter table if exists public.templates
   add column if not exists visibility text not null default 'private'
   check (visibility in ('private', 'public', 'unlisted'));
+
+alter table if exists public.templates
+  add column if not exists rating_average numeric(3, 2) not null default 0
+  check (rating_average >= 0 and rating_average <= 5);
+
+alter table if exists public.templates
+  add column if not exists rating_count integer not null default 0
+  check (rating_count >= 0);
 
 alter table if exists public.presentations
   add column if not exists visibility text not null default 'private'
@@ -130,3 +139,5 @@ drop trigger if exists set_template_slides_updated_at on public.template_slides;
 create trigger set_template_slides_updated_at
 before update on public.template_slides
 for each row execute function public.set_updated_at();
+
+notify pgrst, 'reload schema';

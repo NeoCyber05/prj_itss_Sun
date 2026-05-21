@@ -12,7 +12,25 @@ const popularSlides = [
   {
     id: 'popular-1',
     title: '第3四半期報告書',
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-1-slide-1',
+      title: '第3四半期報告書',
+      elements: [{
+        id: 'title-pop1',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '第3四半期報告書',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/10',
     views: '15万..',
     slides: 12,
@@ -20,7 +38,25 @@ const popularSlides = [
   {
     id: 'popular-2',
     title: 'マーケティングプレゼンテーション',
-    image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-2-slide-1',
+      title: 'マーケティングプレゼンテーション',
+      elements: [{
+        id: 'title-pop2',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: 'マーケティングプレゼンテーション',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/12/10',
     views: '8.2万..',
     slides: 15,
@@ -28,7 +64,25 @@ const popularSlides = [
   {
     id: 'popular-3',
     title: '新製品ローンチ計画',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-3-slide-1',
+      title: '新製品ローンチ計画',
+      elements: [{
+        id: 'title-pop3',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '新製品ローンチ計画',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/14',
     views: '6.5万..',
     slides: 8,
@@ -36,7 +90,25 @@ const popularSlides = [
   {
     id: 'popular-4',
     title: 'チーム研修資料',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-4-slide-1',
+      title: 'チーム研修資料',
+      elements: [{
+        id: 'title-pop4',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: 'チーム研修資料',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/14',
     views: '4.1万..',
     slides: 14,
@@ -44,7 +116,25 @@ const popularSlides = [
   {
     id: 'popular-5',
     title: '年間売上分析',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-5-slide-1',
+      title: '年間売上分析',
+      elements: [{
+        id: 'title-pop5',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '年間売上分析',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/11/01',
     views: '3.8万..',
     slides: 20,
@@ -52,7 +142,25 @@ const popularSlides = [
   {
     id: 'popular-6',
     title: 'プロジェクト進捗報告',
-    image: 'https://images.unsplash.com/photo-1632516643720-e7f0d0e1580e?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-6-slide-1',
+      title: 'プロジェクト進捗報告',
+      elements: [{
+        id: 'title-pop6',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: 'プロジェクト進捗報告',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/22',
     views: '2.9万..',
     slides: 18,
@@ -60,7 +168,25 @@ const popularSlides = [
   {
     id: 'popular-7',
     title: '顧客満足度調査',
-    image: 'https://images.unsplash.com/photo-1518133835878-5a93ac3fb206?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-7-slide-1',
+      title: '顧客満足度調査',
+      elements: [{
+        id: 'title-pop7',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '顧客満足度調査',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/18',
     views: '2.4万..',
     slides: 10,
@@ -68,7 +194,25 @@ const popularSlides = [
   {
     id: 'popular-8',
     title: '事業戦略レビュー',
-    image: 'https://images.unsplash.com/photo-1632516643720-e7f0d0e1580e?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'popular-8-slide-1',
+      title: '事業戦略レビュー',
+      elements: [{
+        id: 'title-pop8',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '事業戦略レビュー',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/22',
     views: '1.7万..',
     slides: 18,
@@ -180,7 +324,25 @@ const recommendedTemplates = [
   {
     id: 'recommended-1',
     title: 'スタートアップピッチデック',
-    image: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'recommended-1-slide-1',
+      title: 'スタートアップピッチデック',
+      elements: [{
+        id: 'title-1',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: 'スタートアップピッチデック',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/10',
     views: '12万..',
     slides: 10,
@@ -188,7 +350,25 @@ const recommendedTemplates = [
   {
     id: 'recommended-2',
     title: '年間財務報告',
-    image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'recommended-2-slide-1',
+      title: '年間財務報告',
+      elements: [{
+        id: 'title-2',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '年間財務報告',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/11/05',
     views: '9.4万..',
     slides: 16,
@@ -196,7 +376,25 @@ const recommendedTemplates = [
   {
     id: 'recommended-3',
     title: '製品ロードマップ',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'recommended-3-slide-1',
+      title: '製品ロードマップ',
+      elements: [{
+        id: 'title-3',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: '製品ロードマップ',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/18',
     views: '7.1万..',
     slides: 12,
@@ -204,7 +402,25 @@ const recommendedTemplates = [
   {
     id: 'recommended-4',
     title: 'チームオンボーディング',
-    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80',
+    first_slide: {
+      id: 'recommended-4-slide-1',
+      title: 'チームオンボーディング',
+      elements: [{
+        id: 'title-4',
+        type: 'text',
+        x: 20,
+        y: 30,
+        width: 60,
+        height: 15,
+        text: 'チームオンボーディング',
+        style: {
+          align: 'center',
+          bold: true,
+          fontSize: 32,
+          color: '#1f2937'
+        }
+      }]
+    },
     date: '2023/10/22',
     views: '5.6万..',
     slides: 14,
@@ -214,7 +430,7 @@ const recommendedTemplates = [
 const sortOptionIds = ['name', 'created', 'rating', 'views'];
 
 function formatDate(value, language) {
-  if (!value) return '';
+  if (!value) return language === 'vi' ? '18/10/2023' : '2023/10/18';
 
   const date = new Date(value);
 
@@ -243,6 +459,7 @@ function getRecentTemplateCard(template, language) {
 function getLibraryTemplateCard(template, language) {
   const rating = Number(template.rating_average ?? template.rating ?? 0);
   const viewCount = Number(template.view_count ?? template.viewCount ?? 0);
+  const rawDate = template.updated_at ?? template.created_at ?? template.date ?? '';
 
   return {
     id: template.id,
@@ -253,8 +470,8 @@ function getLibraryTemplateCard(template, language) {
     category: template.subject ?? template.category ?? '',
     firstSlide: template.first_slide,
     image: template.thumbnail_url,
-    date: formatDate(template.updated_at ?? template.created_at, language),
-    sortDate: template.updated_at ?? template.created_at ?? '',
+    date: formatDate(rawDate, language),
+    sortDate: rawDate,
     slides: template.slide_count ?? template.page_count ?? 0,
     rating: Number.isFinite(rating) ? rating : 0,
     viewCount: Number.isFinite(viewCount) ? viewCount : 0,

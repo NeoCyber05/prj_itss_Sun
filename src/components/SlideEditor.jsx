@@ -103,6 +103,8 @@ const EDITOR_COPY = {
     copiedSelection: 'Copied selected object',
     invalidImageFile: 'Please choose an image file.',
     tableDialogTitle: 'Add table',
+    tableNameLabel: 'Name',
+    tableNamePlaceholder: 'Table name',
     rowLabel: 'Rows',
     columnLabel: 'Columns',
     insertTable: 'Insert table',
@@ -257,6 +259,8 @@ const EDITOR_COPY = {
     copiedSelection: 'Đã sao chép đối tượng đang chọn',
     invalidImageFile: 'Vui lòng chọn tệp ảnh.',
     tableDialogTitle: 'Thêm bảng',
+    tableNameLabel: 'Tên bảng',
+    tableNamePlaceholder: 'Nhập tên bảng',
     rowLabel: 'Số hàng',
     columnLabel: 'Số cột',
     insertTable: 'Chèn bảng',
@@ -1303,6 +1307,7 @@ function createAiText(copy, index, overrides = {}) {
   });
 }
 
+// eslint-disable-next-line no-unused-vars
 function buildAiDraftSlides(generatedDeck, copy) {
   const deckTitle = generatedDeck.deckTitle || copy.defaultTitle;
   const sourceSlides = generatedDeck.slides?.length
@@ -2378,6 +2383,7 @@ export default function SlideEditor({
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
   const [tableDialogData, setTableDialogData] = useState({
     columns: String(DEFAULT_TABLE_COLUMNS),
+    name: '',
     rows: String(DEFAULT_TABLE_ROWS),
   });
   const [tableDialogError, setTableDialogError] = useState('');
@@ -2757,6 +2763,7 @@ export default function SlideEditor({
     if (itemId === 'table') {
       setTableDialogData({
         columns: String(DEFAULT_TABLE_COLUMNS),
+        name: '',
         rows: String(DEFAULT_TABLE_ROWS),
       });
       setTableDialogError('');
@@ -2824,7 +2831,10 @@ export default function SlideEditor({
       return;
     }
 
+    const tableName = tableDialogData.name.trim() || copy.tableLabel;
+
     addElement('table', {
+      text: tableName,
       table: normalizeTableConfig({ columns, rows }),
     });
     setIsTableDialogOpen(false);
@@ -4252,6 +4262,19 @@ export default function SlideEditor({
                 {copy.saveCancel}
               </button>
             </div>
+            <label className="slide-editor__save-field">
+              <span>{copy.tableNameLabel}</span>
+              <input
+                type="text"
+                value={tableDialogData.name}
+                placeholder={copy.tableNamePlaceholder}
+                onChange={(event) => setTableDialogData((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))}
+                autoFocus
+              />
+            </label>
             <div className="slide-editor__dialog-grid">
               <label className="slide-editor__save-field">
                 <span>{copy.rowLabel}</span>

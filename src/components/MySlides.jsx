@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
 import {
+  deleteSavedTemplate,
   listSavedTemplates,
   updateTemplateShareAccess,
   updateTemplateShareSettings,
@@ -67,6 +68,11 @@ const COPY = {
     shareSettingsLocalOnly: '共有設定を画面上で更新しました。',
     copied: '共有リンクをコピーしました',
     copyFailed: 'リンクをコピーできませんでした',
+    deleteConfirmTitle: 'スライド削除',
+    deleteConfirmBody: '「{{title}}」を完全に削除しますか？',
+    deleteAction: '削除',
+    deleting: '削除中...',
+    deleteError: '削除できませんでした: {{message}}',
   },
   vi: {
     sectionTitle: 'Chia sẻ tài liệu',
@@ -126,6 +132,11 @@ const COPY = {
     shareSettingsLocalOnly: 'Đã cập nhật cài đặt trên giao diện.',
     copied: 'Đã sao chép link chia sẻ',
     copyFailed: 'Không thể sao chép link',
+    deleteConfirmTitle: 'Xóa slide',
+    deleteConfirmBody: 'Xóa "{{title}}" vĩnh viễn?',
+    deleteAction: 'Xóa',
+    deleting: 'Đang xóa...',
+    deleteError: 'Không thể xóa: {{message}}',
   },
 };
 
@@ -253,6 +264,14 @@ function SmallIcon({ name, size = 18 }) {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
+    case 'trash':
+      return (
+        <svg {...common}>
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -288,6 +307,8 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
   const [error, setError] = useState('');
   const [revokingTemplateId, setRevokingTemplateId] = useState('');
   const [pendingRevokeTemplate, setPendingRevokeTemplate] = useState(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState('');
+  const [pendingDeleteTemplate, setPendingDeleteTemplate] = useState(null);
   const [shareTemplate, setShareTemplate] = useState(null);
   const [shareAccess, setShareAccess] = useState('private');
   const [shareSettings, setShareSettings] = useState(DEFAULT_SHARE_SETTINGS);
@@ -544,6 +565,30 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
     }
   }
 
+  function handleRequestDelete(template) {
+    setPendingDeleteTemplate(template);
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDeleteTemplate) return;
+
+    setDeletingTemplateId(pendingDeleteTemplate.id);
+    setError('');
+
+    try {
+      await deleteSavedTemplate(pendingDeleteTemplate.id, currentUserId);
+
+      setTemplates((currentTemplates) =>
+        currentTemplates.filter((item) => item.id !== pendingDeleteTemplate.id)
+      );
+      setPendingDeleteTemplate(null);
+    } catch (deleteFailure) {
+      setError(formatCopy(copy.deleteError, { message: deleteFailure.message }));
+    } finally {
+      setDeletingTemplateId('');
+    }
+  }
+
   return (
     <section className="ms-page" aria-labelledby="msSectionTitle">
       <div className="ms-page__header">
@@ -619,6 +664,18 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
                     >
                       {copy.manageLink}
                     </button>
+                    {canManageTemplate(template, currentUserId) && (
+                      <button
+                        type="button"
+                        className="ms-card__delete-btn"
+                        onClick={() => handleRequestDelete(template)}
+                        disabled={deletingTemplateId === template.id}
+                        aria-label={copy.deleteAction}
+                      >
+                        <SmallIcon name="trash" size={16} />
+                        {deletingTemplateId === template.id ? copy.deleting : copy.deleteAction}
+                      </button>
+                    )}
                   </div>
                 </article>
               );
@@ -703,6 +760,37 @@ export default function MySlides({ currentUserEmail, currentUserId, onOpenTempla
                 disabled={Boolean(revokingTemplateId)}
               >
                 {revokingTemplateId ? copy.revoking : copy.revokeAction}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteTemplate && (
+        <div className="ms-modal" role="dialog" aria-modal="true" aria-labelledby="msDeleteTitle">
+          <div className="ms-modal__card">
+            <h2 id="msDeleteTitle" className="ms-modal__title">{copy.deleteConfirmTitle}</h2>
+            <p className="ms-modal__text">
+              {formatCopy(copy.deleteConfirmBody, {
+                title: getTemplateTitle(pendingDeleteTemplate, copy),
+              })}
+            </p>
+            <div className="ms-modal__actions">
+              <button
+                type="button"
+                className="ms-modal__btn ms-modal__btn--ghost"
+                onClick={() => setPendingDeleteTemplate(null)}
+                disabled={Boolean(deletingTemplateId)}
+              >
+                {copy.cancel}
+              </button>
+              <button
+                type="button"
+                className="ms-modal__btn ms-modal__btn--danger"
+                onClick={handleConfirmDelete}
+                disabled={Boolean(deletingTemplateId)}
+              >
+                {deletingTemplateId ? copy.deleting : copy.deleteAction}
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { supabase, supabaseAnonKey, supabaseUrl } from '../supabaseClient';
 
 const DEFAULT_COPY = {
   ja: {
@@ -231,6 +231,207 @@ function isMissingColumnError(error, columnName) {
   return false;
 }
 
+function isSupabaseFetchFailure(error) {
+  const message = String(error?.message ?? '');
+  const details = String(error?.details ?? '');
+
+  return error?.name === 'TypeError'
+    || message.includes('Failed to fetch')
+    || details.includes('Failed to fetch');
+}
+
+function makeSupabaseRestError(response, body) {
+  return {
+    code: body?.code ?? String(response.status),
+    details: body?.details ?? null,
+    hint: body?.hint ?? null,
+    message: body?.message ?? `Supabase request failed with status ${response.status}.`,
+    status: response.status,
+  };
+}
+
+async function getSupabaseRestHeaders() {
+  let accessToken;
+
+  try {
+    const { data } = await supabase.auth.getSession();
+    accessToken = data?.session?.access_token ?? '';
+  } catch {
+    accessToken = '';
+  }
+
+  return {
+    apikey: supabaseAnonKey,
+    authorization: `Bearer ${accessToken || supabaseAnonKey}`,
+  };
+}
+
+async function fetchSupabaseRows(tableName, configureSearchParams) {
+  try {
+    const url = new URL(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${tableName}`);
+    configureSearchParams(url.searchParams);
+
+    const response = await fetch(url.toString(), {
+      headers: await getSupabaseRestHeaders(),
+    });
+    const rawBody = await response.text();
+    const body = rawBody ? JSON.parse(rawBody) : null;
+
+    if (!response.ok) {
+      return {
+        data: null,
+        error: makeSupabaseRestError(response, body),
+      };
+    }
+
+    return {
+      data: Array.isArray(body) ? body : [],
+      error: null,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error: {
+        code: '',
+        details: error?.stack ?? null,
+        hint: null,
+        message: `${error?.name ?? 'Error'}: ${error?.message ?? 'Failed to fetch'}`,
+        name: error?.name,
+      },
+    };
+  }
+}
+
+async function runReadQueryWithRestFallback(query, fetchFallbackRows) {
+  const response = await query;
+
+  if (!response.error || !isSupabaseFetchFailure(response.error)) {
+    return response;
+  }
+
+  return fetchFallbackRows();
+}
+
+async function fetchOwnedTemplates(userId) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('templates')
+      .select('*')
+      .eq('owner_id', userId),
+    () => fetchSupabaseRows('templates', (params) => {
+      params.set('select', '*');
+      params.set('owner_id', `eq.${userId}`);
+    }),
+  );
+}
+
+async function fetchOwnedTemplatesByIds(userId, templateIds) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('templates')
+      .select('*')
+      .eq('owner_id', userId)
+      .in('id', templateIds),
+    () => fetchSupabaseRows('templates', (params) => {
+      params.set('select', '*');
+      params.set('owner_id', `eq.${userId}`);
+      params.set('id', `in.(${templateIds.join(',')})`);
+    }),
+  );
+}
+
+async function fetchRecentlyOpenedTemplates(userId, limit) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('templates')
+      .select('*')
+      .eq('owner_id', userId)
+      .not('last_opened_at', 'is', null)
+      .order('last_opened_at', { ascending: false })
+      .limit(limit),
+    () => fetchSupabaseRows('templates', (params) => {
+      params.set('select', '*');
+      params.set('owner_id', `eq.${userId}`);
+      params.set('last_opened_at', 'not.is.null');
+      params.set('order', 'last_opened_at.desc');
+      params.set('limit', String(limit));
+    }),
+  );
+}
+
+async function fetchTemplateById(templateId) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('templates')
+      .select('*')
+      .eq('id', templateId)
+      .maybeSingle(),
+    async () => {
+      const { data, error } = await fetchSupabaseRows('templates', (params) => {
+        params.set('select', '*');
+        params.set('id', `eq.${templateId}`);
+        params.set('limit', '1');
+      });
+
+      return {
+        data: data?.[0] ?? null,
+        error,
+      };
+    },
+  );
+}
+
+async function fetchSlidePagesByTemplateIds(templateIds) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('slide_pages')
+      .select('id,presentation_id,page_order,title,content_json,thumbnail_url')
+      .in('presentation_id', templateIds)
+      .order('page_order', { ascending: true }),
+    () => fetchSupabaseRows('slide_pages', (params) => {
+      params.set('select', 'id,presentation_id,page_order,title,content_json,thumbnail_url');
+      params.set('presentation_id', `in.(${templateIds.join(',')})`);
+      params.set('order', 'page_order.asc');
+    }),
+  );
+}
+
+async function fetchSlidePagesForTemplate(templateId) {
+  return runReadQueryWithRestFallback(
+    supabase
+      .from('slide_pages')
+      .select('*')
+      .eq('presentation_id', templateId)
+      .order('page_order', { ascending: true }),
+    () => fetchSupabaseRows('slide_pages', (params) => {
+      params.set('select', '*');
+      params.set('presentation_id', `eq.${templateId}`);
+      params.set('order', 'page_order.asc');
+    }),
+  );
+}
+
+async function fetchInvitedTemplates(userEmail, limit, orderColumn = 'updated_at') {
+  const normalizedUserEmail = normalizeInviteEmail(userEmail);
+
+  if (!normalizedUserEmail) {
+    return { data: [], error: null };
+  }
+
+  return runReadQueryWithRestFallback(
+    buildInvitedTemplatesQuery(normalizedUserEmail, limit, orderColumn),
+    () => fetchSupabaseRows('templates', (params) => {
+      params.set('select', '*');
+      params.set('share_settings', `cs.${JSON.stringify({ invitedEmails: [normalizedUserEmail] })}`);
+      params.set('limit', String(limit));
+
+      if (orderColumn) {
+        params.set('order', `${orderColumn}.desc`);
+      }
+    }),
+  );
+}
+
 function isMissingSortColumnError(error) {
   return isMissingColumnError(error, 'updated_at')
     || isMissingColumnError(error, 'created_at');
@@ -292,11 +493,7 @@ async function getSlideSummaryByTemplateId(templateIds) {
     };
   }
 
-  const { data: slides, error: slidesError } = await supabase
-    .from('slide_pages')
-    .select('id,presentation_id,page_order,title,content_json,thumbnail_url')
-    .in('presentation_id', templateIds)
-    .order('page_order', { ascending: true });
+  const { data: slides, error: slidesError } = await fetchSlidePagesByTemplateIds(templateIds);
 
   if (slidesError) {
     throw slidesError;
@@ -338,6 +535,23 @@ async function attachSlideSummaries(templateRows) {
   });
 }
 
+async function attachSlideSummariesForSavedTemplates(templateRows) {
+  try {
+    return await attachSlideSummaries(templateRows);
+  } catch (error) {
+    if (!isSupabaseFetchFailure(error)) {
+      throw error;
+    }
+
+    console.warn(
+      'Failed to load saved slide preview details from Supabase; showing saved slides without previews:',
+      error,
+    );
+
+    return templateRows.map(normalizeTemplate);
+  }
+}
+
 async function listLocalRecentTemplates(userId, recentAccess) {
   const recentTemplateIds = recentAccess.map((item) => item.templateId);
 
@@ -349,11 +563,10 @@ async function listLocalRecentTemplates(userId, recentAccess) {
     recentAccess.map((item) => [item.templateId, item.openedAt]),
   );
 
-  const { data: templates, error: templateError } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('owner_id', userId)
-    .in('id', recentTemplateIds);
+  const { data: templates, error: templateError } = await fetchOwnedTemplatesByIds(
+    userId,
+    recentTemplateIds,
+  );
 
   if (templateError) {
     throw templateError;
@@ -443,13 +656,7 @@ async function runInvitedTemplatesQuery(userEmail, limit) {
   let lastError = null;
 
   for (const orderColumn of ['updated_at', 'created_at', '']) {
-    const query = buildInvitedTemplatesQuery(userEmail, limit, orderColumn);
-
-    if (!query) {
-      return { data: [], error: null };
-    }
-
-    const response = await query;
+    const response = await fetchInvitedTemplates(userEmail, limit, orderColumn);
 
     if (!response.error) {
       return response;
@@ -633,11 +840,7 @@ export async function getDeckForEditor(templateId, userId, userEmail = '') {
   requireValue(templateId, 'A template id is required to load the editor.');
   requireValue(userId, 'A signed-in user is required to load this slide.');
 
-  const { data: template, error: templateError } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('id', templateId)
-    .maybeSingle();
+  const { data: template, error: templateError } = await fetchTemplateById(templateId);
 
   if (templateError) {
     throw templateError;
@@ -653,11 +856,7 @@ export async function getDeckForEditor(templateId, userId, userEmail = '') {
     throw new Error('Slide draft was not found.');
   }
 
-  const { data: slides, error: slidesError } = await supabase
-    .from('slide_pages')
-    .select('*')
-    .eq('presentation_id', templateId)
-    .order('page_order', { ascending: true });
+  const { data: slides, error: slidesError } = await fetchSlidePagesForTemplate(templateId);
 
   if (slidesError) {
     throw slidesError;
@@ -669,10 +868,7 @@ export async function getDeckForEditor(templateId, userId, userEmail = '') {
 export async function listSavedTemplates(userId, userEmail = '') {
   requireValue(userId, 'A signed-in user is required to load saved slides.');
 
-  const { data: ownedTemplates, error: templateError } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('owner_id', userId);
+  const { data: ownedTemplates, error: templateError } = await fetchOwnedTemplates(userId);
 
   if (templateError) {
     throw templateError;
@@ -694,7 +890,7 @@ export async function listSavedTemplates(userId, userEmail = '') {
     }
   }
 
-  const templatesWithCounts = await attachSlideSummaries(
+  const templatesWithCounts = await attachSlideSummariesForSavedTemplates(
     dedupeTemplatesById([...(ownedTemplates ?? []), ...invitedTemplates]),
   );
 
@@ -711,13 +907,7 @@ export async function listRecentlyOpenedTemplates(userId, limit = 4) {
   requireValue(userId, 'A signed-in user is required to load recent slides.');
 
   const localRecentAccess = readLocalRecentTemplateAccess(userId).slice(0, Math.max(limit, 20));
-  const { data: templates, error: templateError } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('owner_id', userId)
-    .not('last_opened_at', 'is', null)
-    .order('last_opened_at', { ascending: false })
-    .limit(limit);
+  const { data: templates, error: templateError } = await fetchRecentlyOpenedTemplates(userId, limit);
 
   if (templateError) {
     if (!isMissingLastOpenedAtError(templateError)) {
@@ -1131,4 +1321,54 @@ export async function saveDeckForEditor({
 
     throw error;
   }
+}
+
+export async function updateTemplateRating(templateId, ratingValue) {
+  requireValue(templateId, 'A template id is required to submit a rating.');
+  requireValue(ratingValue, 'A rating value is required.');
+
+  const normalizedRating = Number(ratingValue);
+
+  if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+    throw new Error('Rating must be a number between 1 and 5.');
+  }
+
+  const { data: currentTemplate, error: fetchError } = await supabase
+    .from('templates')
+    .select('rating_average,rating_count')
+    .eq('id', templateId)
+    .maybeSingle();
+
+  if (fetchError) {
+    if (isMissingColumnError(fetchError, 'rating_average') || isMissingColumnError(fetchError, 'rating_count')) {
+      throw new Error('Database schema is missing templates.rating_average or templates.rating_count. Run backend/database/schema.sql and reload the Supabase schema cache.');
+    }
+
+    throw fetchError;
+  }
+
+  const currentAverage = Number(currentTemplate?.rating_average ?? 0);
+  const currentCount = Math.max(0, Number(currentTemplate?.rating_count ?? 0));
+  const nextCount = currentCount + 1;
+  const nextAverage = Number((((currentAverage || 0) * currentCount + normalizedRating) / nextCount).toFixed(1));
+
+  const { data, error } = await supabase
+    .from('templates')
+    .update({
+      rating_average: nextAverage,
+      rating_count: nextCount,
+    })
+    .eq('id', templateId)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingColumnError(error, 'rating_average') || isMissingColumnError(error, 'rating_count')) {
+      throw new Error('Database schema is missing templates.rating_average or templates.rating_count. Run backend/database/schema.sql and reload the Supabase schema cache.');
+    }
+
+    throw error;
+  }
+
+  return data;
 }

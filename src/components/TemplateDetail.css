@@ -281,12 +281,41 @@
   gap: 18px;
 }
 
-.template-detail__info h2 {
+.template-detail__info-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.template-detail__info-header h2 {
   margin: 0;
   color: #020617;
   font-size: clamp(1.55rem, 2.6vw, 2.15rem);
   font-weight: 900;
   line-height: 1.15;
+}
+
+.template-detail__rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.template-detail__star {
+  flex-shrink: 0;
+}
+
+.template-detail__star--full path {
+  fill: #f59e0b;
+}
+
+.template-detail__rating-value {
+  margin-left: 6px;
+  color: #334155;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .template-detail__info p {
@@ -479,3 +508,172 @@
 :fullscreen .template-detail__modal-header strong { display: none; }
 :fullscreen .template-detail-slide-preview { flex-grow: 1; height: auto; }
 :fullscreen .template-detail__modal-controls { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 130; background: rgba(255, 255, 255, 0.8); padding: 8px; border-radius: var(--radius-md); display: flex; }
+
+.template-detail__modal--rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.template-detail__rating-dialog {
+  display: grid;
+  width: min(520px, 92vw);
+  gap: 20px;
+  padding: 28px 32px 32px;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.3);
+}
+
+.template-detail__rating-dialog__title {
+  margin: 0;
+  color: #020617;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.template-detail__rating-dialog__target {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.template-detail__rating-dialog__thumb {
+  width: 120px;
+  min-width: 120px;
+  overflow: hidden;
+  border: 1px solid #d5e0ea;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+}
+
+.template-detail__rating-dialog__target-info {
+  display: grid;
+  gap: 4px;
+}
+
+.template-detail__rating-dialog__target-info strong {
+  color: #334155;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.template-detail__rating-dialog__target-info span {
+  color: #111827;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.template-detail__rating-dialog__stars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.template-detail__rating-dialog__label-min,
+.template-detail__rating-dialog__label-max {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.template-detail__rating-dialog__star-group {
+  display: flex;
+  gap: 6px;
+}
+
+.template-detail__rating-dialog__star {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.template-detail__rating-dialog__star:hover {
+  transform: scale(1.15);
+}
+
+.template-detail__rating-dialog__star--active svg path {
+  fill: #f59e0b;
+  stroke: #f59e0b;
+}
+
+.template-detail__rating-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.template-detail__rating-dialog__btn {
+  min-height: 44px;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.template-detail__rating-dialog__btn--submit {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.template-detail__rating-dialog__btn--submit:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.template-detail__rating-dialog__btn--submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.template-detail__rating-dialog__btn--cancel {
+  border: 1px solid #aebdca;
+  background: #ffffff;
+  color: #172033;
+}
+
+.template-detail__rating-dialog__btn--cancel:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.template-detail__rating-dialog__btn--cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .template-detail__rating-dialog {
+    padding: 20px 18px 24px;
+    gap: 16px;
+  }
+
+  .template-detail__rating-dialog__title {
+    font-size: 1.2rem;
+  }
+
+  .template-detail__rating-dialog__thumb {
+    width: 90px;
+    min-width: 90px;
+  }
+
+  .template-detail__rating-dialog__star svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .template-detail__rating-dialog__actions {
+    flex-direction: column;
+  }
+
+  .template-detail__rating-dialog__btn {
+    width: 100%;
+  }
+}
