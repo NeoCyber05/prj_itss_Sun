@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
@@ -613,6 +613,24 @@ export default function TemplateDetail({
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUsing, setIsUsing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [savedDeckId, setSavedDeckId] = useState('');
+  const [toast, setToast] = useState('');
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [localRating, setLocalRating] = useState(null);
+  const shouldLoadSavedDeck = Boolean(isPersistedUuid(templateId) && currentUserId);
+
+  const detail = useMemo(() => {
+    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language);
+    return buildDetailFromTemplate(initialTemplate, copy, language);
+  }, [copy, initialTemplate, language, loadedDeck]);
+  const slideCount = detail.slides.length;
+  const goToSlide = useCallback((index) => {
+    setActiveSlideIndex(clamp(index, 0, slideCount - 1));
+  }, [slideCount]);
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -655,17 +673,7 @@ export default function TemplateDetail({
 
     document.addEventListener('keydown', handlePreviewKeyDown);
     return () => document.removeEventListener('keydown', handlePreviewKeyDown);
-  }, [isPreviewOpen, activeSlideIndex, detail.slides.length]);
-
-  const [isUsing, setIsUsing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [savedDeckId, setSavedDeckId] = useState('');
-  const [toast, setToast] = useState('');
-  const [isRatingOpen, setIsRatingOpen] = useState(false);
-  const [ratingValue, setRatingValue] = useState(0);
-  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-  const [localRating, setLocalRating] = useState(null);
-  const shouldLoadSavedDeck = Boolean(isPersistedUuid(templateId) && currentUserId);
+  }, [activeSlideIndex, goToSlide, isPreviewOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -688,11 +696,6 @@ export default function TemplateDetail({
       isMounted = false;
     };
   }, [copy.loadError, currentUserEmail, currentUserId, shouldLoadSavedDeck, templateId]);
-
-  const detail = useMemo(() => {
-    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language);
-    return buildDetailFromTemplate(initialTemplate, copy, language);
-  }, [copy, initialTemplate, language, loadedDeck]);
 
   const ratingToShow = localRating !== null ? localRating : detail.rating;
 
@@ -851,10 +854,6 @@ export default function TemplateDetail({
     } finally {
       setIsDownloading(false);
     }
-  }
-
-  function goToSlide(index) {
-    setActiveSlideIndex(clamp(index, 0, detail.slides.length - 1));
   }
 
   return (

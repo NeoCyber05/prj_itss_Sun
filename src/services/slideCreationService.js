@@ -20,6 +20,10 @@ const DEFAULT_SHARE_SETTINGS = {
   allowReshare: false,
   invitedEmails: [],
 };
+const TEMPLATE_OPTIONAL_COLUMN_STATE = {
+  last_opened_at: null,
+  share_settings: null,
+};
 
 function getCopy(language) {
   return DEFAULT_COPY[language] ?? DEFAULT_COPY.ja;
@@ -160,6 +164,43 @@ function normalizeTemplate(row) {
     invited_count: shareSettings.invitedEmails.length,
     status: row.status ?? 'draft',
   };
+}
+
+function hasOwnColumn(row, columnName) {
+  return Object.prototype.hasOwnProperty.call(row ?? {}, columnName);
+}
+
+function rememberTemplateColumns(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  for (const columnName of Object.keys(TEMPLATE_OPTIONAL_COLUMN_STATE)) {
+    TEMPLATE_OPTIONAL_COLUMN_STATE[columnName] = rows.some((row) => hasOwnColumn(row, columnName));
+  }
+}
+
+function rememberTemplateResponse(response) {
+  if (!response?.error) {
+    const rows = Array.isArray(response?.data)
+      ? response.data
+      : response?.data
+        ? [response.data]
+        : [];
+    rememberTemplateColumns(rows);
+  }
+
+  return response;
+}
+
+function markTemplateColumnMissing(columnName) {
+  if (hasOwnColumn(TEMPLATE_OPTIONAL_COLUMN_STATE, columnName)) {
+    TEMPLATE_OPTIONAL_COLUMN_STATE[columnName] = false;
+  }
+}
+
+function canQueryTemplateColumn(columnName) {
+  return TEMPLATE_OPTIONAL_COLUMN_STATE[columnName] === true;
 }
 
 function normalizeSlide(row) {
@@ -313,7 +354,7 @@ async function runReadQueryWithRestFallback(query, fetchFallbackRows) {
 }
 
 async function fetchOwnedTemplates(userId) {
-  return runReadQueryWithRestFallback(
+  return rememberTemplateResponse(await runReadQueryWithRestFallback(
     supabase
       .from('templates')
       .select('*')
@@ -322,11 +363,11 @@ async function fetchOwnedTemplates(userId) {
       params.set('select', '*');
       params.set('owner_id', `eq.${userId}`);
     }),
-  );
+  ));
 }
 
 async function fetchOwnedTemplatesByIds(userId, templateIds) {
-  return runReadQueryWithRestFallback(
+  return rememberTemplateResponse(await runReadQueryWithRestFallback(
     supabase
       .from('templates')
       .select('*')
@@ -337,11 +378,15 @@ async function fetchOwnedTemplatesByIds(userId, templateIds) {
       params.set('owner_id', `eq.${userId}`);
       params.set('id', `in.(${templateIds.join(',')})`);
     }),
-  );
+  ));
 }
 
 async function fetchRecentlyOpenedTemplates(userId, limit) {
-  return runReadQueryWithRestFallback(
+  if (!canQueryTemplateColumn('last_opened_at')) {
+    return { data: [], error: null };
+  }
+
+  const response = await runReadQueryWithRestFallback(
     supabase
       .from('templates')
       .select('*')
@@ -357,10 +402,16 @@ async function fetchRecentlyOpenedTemplates(userId, limit) {
       params.set('limit', String(limit));
     }),
   );
+
+  if (response.error && isMissingLastOpenedAtError(response.error)) {
+    markTemplateColumnMissing('last_opened_at');
+  }
+
+  return rememberTemplateResponse(response);
 }
 
 async function fetchTemplateById(templateId) {
-  return runReadQueryWithRestFallback(
+  return rememberTemplateResponse(await runReadQueryWithRestFallback(
     supabase
       .from('templates')
       .select('*')
@@ -378,7 +429,7 @@ async function fetchTemplateById(templateId) {
         error,
       };
     },
-  );
+  ));
 }
 
 async function fetchSlidePagesByTemplateIds(templateIds) {
@@ -411,30 +462,21 @@ async function fetchSlidePagesForTemplate(templateId) {
   );
 }
 
-async function fetchInvitedTemplates(userEmail, limit, orderColumn = 'updated_at') {
+async function fetchInvitedTemplates(userEmail, limit) {
   const normalizedUserEmail = normalizeInviteEmail(userEmail);
 
-  if (!normalizedUserEmail) {
+  if (!normalizedUserEmail || !canQueryTemplateColumn('share_settings')) {
     return { data: [], error: null };
   }
 
-  return runReadQueryWithRestFallback(
-    buildInvitedTemplatesQuery(normalizedUserEmail, limit, orderColumn),
+  return rememberTemplateResponse(await runReadQueryWithRestFallback(
+    buildInvitedTemplatesQuery(normalizedUserEmail, limit),
     () => fetchSupabaseRows('templates', (params) => {
       params.set('select', '*');
       params.set('share_settings', `cs.${JSON.stringify({ invitedEmails: [normalizedUserEmail] })}`);
       params.set('limit', String(limit));
-
-      if (orderColumn) {
-        params.set('order', `${orderColumn}.desc`);
-      }
     }),
-  );
-}
-
-function isMissingSortColumnError(error) {
-  return isMissingColumnError(error, 'updated_at')
-    || isMissingColumnError(error, 'created_at');
+  ));
 }
 
 function getRecentTemplateStorageKey(userId) {
@@ -580,7 +622,7 @@ async function listLocalRecentTemplates(userId, recentAccess) {
   }));
 }
 
-function buildSearchableTemplatesQuery(userId, limit, useVisibilityColumn, orderColumn = 'updated_at') {
+function buildSearchableTemplatesQuery(userId, limit, useVisibilityColumn) {
   let query = supabase
     .from('templates')
     .select('*');
@@ -595,10 +637,6 @@ function buildSearchableTemplatesQuery(userId, limit, useVisibilityColumn, order
       : query.eq('is_public', true);
   }
 
-  if (orderColumn) {
-    query = query.order(orderColumn, { ascending: false });
-  }
-
   return query.limit(limit);
 }
 
@@ -606,57 +644,11 @@ async function runSearchableTemplatesQuery(userId, limit) {
   let lastError = null;
 
   for (const useVisibilityColumn of [true, false]) {
-    for (const orderColumn of ['updated_at', 'created_at', '']) {
-      const response = await buildSearchableTemplatesQuery(
-        userId,
-        limit,
-        useVisibilityColumn,
-        orderColumn,
-      );
-
-      if (!response.error) {
-        return response;
-      }
-
-      lastError = response.error;
-
-      if (isMissingVisibilityError(response.error)) {
-        break;
-      }
-
-      if (!isMissingSortColumnError(response.error)) {
-        return response;
-      }
-    }
-  }
-
-  return { data: null, error: lastError };
-}
-
-function buildInvitedTemplatesQuery(userEmail, limit, orderColumn = 'updated_at') {
-  const normalizedUserEmail = normalizeInviteEmail(userEmail);
-
-  if (!normalizedUserEmail) {
-    return null;
-  }
-
-  let query = supabase
-    .from('templates')
-    .select('*')
-    .contains('share_settings', { invitedEmails: [normalizedUserEmail] });
-
-  if (orderColumn) {
-    query = query.order(orderColumn, { ascending: false });
-  }
-
-  return query.limit(limit);
-}
-
-async function runInvitedTemplatesQuery(userEmail, limit) {
-  let lastError = null;
-
-  for (const orderColumn of ['updated_at', 'created_at', '']) {
-    const response = await fetchInvitedTemplates(userEmail, limit, orderColumn);
+    const response = rememberTemplateResponse(await buildSearchableTemplatesQuery(
+      userId,
+      limit,
+      useVisibilityColumn,
+    ));
 
     if (!response.error) {
       return response;
@@ -664,16 +656,36 @@ async function runInvitedTemplatesQuery(userEmail, limit) {
 
     lastError = response.error;
 
-    if (isMissingShareSettingsError(response.error)) {
-      return response;
-    }
-
-    if (!isMissingSortColumnError(response.error)) {
+    if (!isMissingVisibilityError(response.error)) {
       return response;
     }
   }
 
   return { data: null, error: lastError };
+}
+
+function buildInvitedTemplatesQuery(userEmail, limit) {
+  const normalizedUserEmail = normalizeInviteEmail(userEmail);
+
+  if (!normalizedUserEmail || !canQueryTemplateColumn('share_settings')) {
+    return null;
+  }
+
+  return supabase
+    .from('templates')
+    .select('*')
+    .contains('share_settings', { invitedEmails: [normalizedUserEmail] })
+    .limit(limit);
+}
+
+async function runInvitedTemplatesQuery(userEmail, limit) {
+  const response = await fetchInvitedTemplates(userEmail, limit);
+
+  if (response.error && isMissingShareSettingsError(response.error)) {
+    markTemplateColumnMissing('share_settings');
+  }
+
+  return response;
 }
 
 export async function listSearchableTemplates(userId, userEmail, limit = 120) {
@@ -947,6 +959,10 @@ export async function recordTemplateOpened({ templateId, userId }) {
   const openedAt = new Date().toISOString();
   writeLocalRecentTemplateAccess({ templateId, userId, openedAt });
 
+  if (!canQueryTemplateColumn('last_opened_at')) {
+    return openedAt;
+  }
+
   const { error: templateError } = await supabase
     .from('templates')
     .update({ last_opened_at: openedAt })
@@ -955,7 +971,8 @@ export async function recordTemplateOpened({ templateId, userId }) {
 
   if (templateError) {
     if (isMissingLastOpenedAtError(templateError)) {
-      return null;
+      markTemplateColumnMissing('last_opened_at');
+      return openedAt;
     }
 
     throw templateError;
@@ -1029,14 +1046,24 @@ export async function updateTemplateShareAccess({
     ...normalizedSettings,
     accessMode: visibility,
   };
+  const canPersistShareSettings = canQueryTemplateColumn('share_settings');
+  const templatePayload = {
+    is_public: isPublic,
+    visibility,
+    ...(canPersistShareSettings ? { share_settings: nextShareSettings } : {}),
+  };
 
   const { data: template, error: templateError } = await supabase
     .from('templates')
-    .update({ is_public: isPublic, share_settings: nextShareSettings, visibility })
+    .update(templatePayload)
     .eq('id', templateId)
     .eq('owner_id', userId)
     .select('*')
     .single();
+
+  if (templateError && isMissingShareSettingsError(templateError)) {
+    markTemplateColumnMissing('share_settings');
+  }
 
   if (
     templateError
@@ -1055,7 +1082,7 @@ export async function updateTemplateShareAccess({
       fallbackTemplatePayload.visibility = visibility;
     }
 
-    if (!isMissingShareSettingsError(templateError)) {
+    if (canPersistShareSettings && !isMissingShareSettingsError(templateError)) {
       fallbackTemplatePayload.share_settings = nextShareSettings;
     }
 
@@ -1077,11 +1104,20 @@ export async function updateTemplateShareAccess({
     };
   }
 
+  const presentationPayload = {
+    is_public: isPublic,
+    visibility,
+    ...(canPersistShareSettings ? { share_settings: nextShareSettings } : {}),
+  };
   const { error: presentationError } = await supabase
     .from('presentations')
-    .update({ is_public: isPublic, share_settings: nextShareSettings, visibility })
+    .update(presentationPayload)
     .eq('id', templateId)
     .eq('owner_id', userId);
+
+  if (presentationError && isMissingShareSettingsError(presentationError)) {
+    markTemplateColumnMissing('share_settings');
+  }
 
   if (
     presentationError
@@ -1098,7 +1134,7 @@ export async function updateTemplateShareAccess({
       fallbackPresentationPayload.visibility = visibility;
     }
 
-    if (!isMissingShareSettingsError(presentationError)) {
+    if (canPersistShareSettings && !isMissingShareSettingsError(presentationError)) {
       fallbackPresentationPayload.share_settings = nextShareSettings;
     }
 
@@ -1130,6 +1166,13 @@ export async function updateTemplateShareSettings({
 
   const normalizedSettings = normalizeShareSettings(settings);
 
+  if (!canQueryTemplateColumn('share_settings')) {
+    return {
+      share_settings: normalizedSettings,
+      share_settings_persisted: false,
+    };
+  }
+
   const { data: template, error: templateError } = await supabase
     .from('templates')
     .update({ share_settings: normalizedSettings })
@@ -1142,6 +1185,8 @@ export async function updateTemplateShareSettings({
     if (!isMissingShareSettingsError(templateError)) {
       throw templateError;
     }
+
+    markTemplateColumnMissing('share_settings');
 
     return {
       share_settings: normalizedSettings,
