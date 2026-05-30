@@ -298,15 +298,16 @@ function normalizeDetailSlide(slide, index, fallbackTitle) {
   };
 }
 
-function buildDetailFromDeck(deck, copy, language, currentUserId, currentUserEmail) {
+function buildDetailFromDeck(deck, copy, language, currentUserId, currentUserEmail, userProfile) {
   const template = deck?.template;
   const title = template?.title?.trim() || copy.defaultCategory;
   const slides = (deck?.slides?.length ? deck.slides : [])
     .map((slide, index) => normalizeDetailSlide(slide, index, title));
 
   const ownerId = template?.owner_id;
-  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId && currentUserEmail)
-    ? currentUserEmail.split('@')[0]
+  const userDisplayName = userProfile?.display_name || userProfile?.full_name || userProfile?.name;
+  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId)
+    ? (userDisplayName || currentUserEmail?.split('@')[0] || copy.defaultAuthor)
     : copy.defaultAuthor;
 
   return {
@@ -326,7 +327,7 @@ function buildDetailFromDeck(deck, copy, language, currentUserId, currentUserEma
   };
 }
 
-function buildDetailFromTemplate(template, copy, language, currentUserId, currentUserEmail) {
+function buildDetailFromTemplate(template, copy, language, currentUserId, currentUserEmail, userProfile) {
   const title = template?.title?.trim() || copy.defaultCategory;
   const slides = template?.detailSlides?.length
     ? template.detailSlides.map((slide, index) => normalizeDetailSlide(slide, index, title))
@@ -335,8 +336,9 @@ function buildDetailFromTemplate(template, copy, language, currentUserId, curren
   const isPersisted = isPersistedUuid(template?.id);
   const ownerId = template?.owner_id ?? template?.template?.owner_id;
 
-  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId && currentUserEmail)
-    ? currentUserEmail.split('@')[0]
+  const userDisplayName = userProfile?.display_name || userProfile?.full_name || userProfile?.name;
+  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId)
+    ? (userDisplayName || currentUserEmail?.split('@')[0] || copy.defaultAuthor)
     : copy.defaultAuthor;
 
   // Sinh tên tác giả chân thực và sinh động cho các slide tĩnh
@@ -560,100 +562,132 @@ function TemplateSlidePreview({ slide, title, scale = 1 }) {
   const elements = getSlideElements(slide);
   const image = slide?.image ?? slide?.thumbnail_url;
 
-  return (
-    <div className="template-detail-slide-preview">
-      {image && elements.length === 0 ? (
-        <img src={image} alt={title} />
-      ) : (
-        <>
-          {image && (
-            <img className="template-detail-slide-preview__watermark" src={image} alt="" />
-          )}
-          {elements.length === 0 ? (
-            <div className="template-detail-slide-preview__fallback">
-              <strong>{title}</strong>
-            </div>
-          ) : elements.map((element) => {
-            const elementStyle = {
-              left: `${element.x ?? 8}%`,
-              top: `${element.y ?? 8}%`,
-              width: `${element.width ?? 84}%`,
-              height: `${element.height ?? 16}%`,
-            };
+  const renderContent = (currentScale) => {
+    return (
+      <>
+        {image && (
+          <img className="template-detail-slide-preview__watermark" src={image} alt="" />
+        )}
+        {elements.length === 0 ? (
+          <div className="template-detail-slide-preview__fallback">
+            <strong>{title}</strong>
+          </div>
+        ) : elements.map((element) => {
+          const elementStyle = {
+            left: `${element.x ?? 8}%`,
+            top: `${element.y ?? 8}%`,
+            width: `${element.width ?? 84}%`,
+            height: `${element.height ?? 16}%`,
+          };
 
-            if (element.type === 'text') {
-              return (
-                <span
-                  key={element.id}
-                  className="template-detail-slide-text"
-                  style={{
-                    ...elementStyle,
-                    color: element.style?.color,
-                    fontFamily: element.style?.fontFamily,
-                    fontSize: `${clamp((element.style?.fontSize ?? 18) * scale, 5, 42)}px`,
-                    fontStyle: element.style?.italic ? 'italic' : 'normal',
-                    fontWeight: element.style?.bold ? 900 : 600,
-                    justifyContent:
-                      element.style?.align === 'center'
-                        ? 'center'
-                        : element.style?.align === 'right'
-                          ? 'flex-end'
-                          : 'flex-start',
-                    textAlign: element.style?.align ?? 'left',
-                    textDecoration: element.style?.underline ? 'underline' : 'none',
-                  }}
-                >
-                  {element.text}
-                </span>
-              );
-            }
-
-            if (element.type === 'image') {
-              return (
-                <span
-                  key={element.id}
-                  className="template-detail-slide-image"
-                  style={{ ...elementStyle, backgroundColor: element.fill }}
-                >
-                  {element.src ? <img src={element.src} alt={element.alt || element.text || ''} /> : element.text}
-                </span>
-              );
-            }
-
-            if (element.type === 'chart') {
-              return (
-                <span key={element.id} className="template-detail-slide-chart" style={elementStyle}>
-                  <strong>{element.text}</strong>
-                  <PreviewChart />
-                </span>
-              );
-            }
-
-            if (element.type === 'table') {
-              return (
-                <span key={element.id} className="template-detail-slide-table-wrap" style={elementStyle}>
-                  <strong>{element.text}</strong>
-                  <PreviewTable />
-                </span>
-              );
-            }
-
+          if (element.type === 'text') {
             return (
               <span
                 key={element.id}
-                className={`template-detail-slide-shape template-detail-slide-shape--${element.type}`}
+                className="template-detail-slide-text"
                 style={{
                   ...elementStyle,
-                  background: element.fill,
-                  borderColor: element.stroke,
+                  color: element.style?.color,
+                  fontFamily: element.style?.fontFamily,
+                  fontSize: `${clamp((element.style?.fontSize ?? 18) * currentScale, 5, 42)}px`,
+                  fontStyle: element.style?.italic ? 'italic' : 'normal',
+                  fontWeight: element.style?.bold ? 900 : 600,
+                  justifyContent:
+                    element.style?.align === 'center'
+                      ? 'center'
+                      : element.style?.align === 'right'
+                        ? 'flex-end'
+                        : 'flex-start',
+                  textAlign: element.style?.align ?? 'left',
+                  textDecoration: element.style?.underline ? 'underline' : 'none',
                 }}
               >
                 {element.text}
               </span>
             );
-          })}
-        </>
-      )}
+          }
+
+          if (element.type === 'image') {
+            return (
+              <span
+                key={element.id}
+                className="template-detail-slide-image"
+                style={{ ...elementStyle, backgroundColor: element.fill }}
+              >
+                {element.src ? <img src={element.src} alt={element.alt || element.text || ''} /> : element.text}
+              </span>
+            );
+          }
+
+          if (element.type === 'chart') {
+            return (
+              <span key={element.id} className="template-detail-slide-chart" style={elementStyle}>
+                <strong>{element.text}</strong>
+                <PreviewChart />
+              </span>
+            );
+          }
+
+          if (element.type === 'table') {
+            return (
+              <span key={element.id} className="template-detail-slide-table-wrap" style={elementStyle}>
+                <strong>{element.text}</strong>
+                <PreviewTable />
+              </span>
+            );
+          }
+
+          return (
+            <span
+              key={element.id}
+              className={`template-detail-slide-shape template-detail-slide-shape--${element.type}`}
+              style={{
+                ...elementStyle,
+                background: element.fill,
+                borderColor: element.stroke,
+              }}
+            >
+              {element.text}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
+
+  if (scale !== 1) {
+    const virtualWidthPercent = 100 / scale;
+    return (
+      <div className="template-detail-slide-preview-scale-wrapper" style={{
+        width: '100%',
+        aspectRatio: '16 / 9',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${virtualWidthPercent}%`,
+          aspectRatio: '16 / 9',
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+        }}>
+          <div className="template-detail-slide-preview" style={{ width: '100%', height: '100%' }}>
+            {image && elements.length === 0 ? (
+              <img src={image} alt={title} />
+            ) : renderContent(1)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="template-detail-slide-preview">
+      {image && elements.length === 0 ? (
+        <img src={image} alt={title} />
+      ) : renderContent(1)}
     </div>
   );
 }
@@ -663,6 +697,7 @@ export default function TemplateDetail({
   initialTemplate,
   currentUserEmail,
   currentUserId,
+  userProfile,
   onBack,
   onCreatedDeck,
   onEditTemplate,
@@ -711,15 +746,15 @@ export default function TemplateDetail({
   }, [templateId]);
 
   const detail = useMemo(() => {
-    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language, currentUserId, currentUserEmail);
+    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language, currentUserId, currentUserEmail, userProfile);
     
     // Merge dữ liệu động từ dbTemplate (rating, owner_id, date...) vào initialTemplate tĩnh
     const baseTemplate = dbTemplate 
       ? { ...initialTemplate, ...dbTemplate } 
       : initialTemplate;
 
-    return buildDetailFromTemplate(baseTemplate, copy, language, currentUserId, currentUserEmail);
-  }, [copy, initialTemplate, language, loadedDeck, dbTemplate, currentUserId, currentUserEmail]);
+    return buildDetailFromTemplate(baseTemplate, copy, language, currentUserId, currentUserEmail, userProfile);
+  }, [copy, initialTemplate, language, loadedDeck, dbTemplate, currentUserId, currentUserEmail, userProfile]);
 
   const [authorName, setAuthorName] = useState('');
 
@@ -730,12 +765,15 @@ export default function TemplateDetail({
     if (ownerId && isPersistedUuid(ownerId)) {
       supabase
         .from('profiles')
-        .select('display_name')
+        .select('display_name, full_name, name')
         .eq('id', ownerId)
         .maybeSingle()
         .then(({ data, error }) => {
-          if (!error && data?.display_name && isMounted) {
-            setAuthorName(data.display_name);
+          if (!error && data && isMounted) {
+            const name = data.display_name || data.full_name || data.name;
+            if (name) {
+              setAuthorName(name);
+            }
           }
         });
     } else {

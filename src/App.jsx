@@ -79,6 +79,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [hasRecoverySession, setHasRecoverySession] = useState(isResetPasswordHash());
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +156,97 @@ export default function App() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProfile() {
+      if (!user?.id) {
+        if (isMounted) setUserProfile(null);
+        return;
+      }
+
+      // 1. Ưu tiên đọc dữ liệu profile từ localStorage để hiển thị tức thời
+      try {
+        const localData = localStorage.getItem(`rakuslide:user-profile:${user.id}`);
+        if (localData && isMounted) {
+          setUserProfile(JSON.parse(localData));
+        }
+      } catch (e) {
+        console.warn('Failed to read profile from localStorage:', e);
+      }
+
+      // 2. Đồng bộ hóa với Database ở dưới nền
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!isMounted) return;
+
+        if (error) {
+          console.error('Error fetching profile:', error.message);
+          return;
+        }
+
+        if (data) {
+          // BẢO VỆ AVATAR CỤC BỘ: Kiểm tra xem local hiện tại có ảnh trong repo không
+          let mergedAvatarUrl = data.avatar_url;
+          
+          try {
+            const localData = localStorage.getItem(`rakuslide:user-profile:${user.id}`);
+            if (localData) {
+              const localProfile = JSON.parse(localData);
+              // Nếu local đang lưu avatar tĩnh trong repo (/avatars/), ta ưu tiên giữ lại nó
+              // và không cho phép avatar mặc định Google (bắt đầu bằng http) từ DB ghi đè lên
+              if (localProfile?.avatar_url && localProfile.avatar_url.startsWith('/avatars/')) {
+                mergedAvatarUrl = localProfile.avatar_url;
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to read local profile for protection:', e);
+          }
+
+          const updatedProfile = {
+            ...data,
+            avatar_url: mergedAvatarUrl
+          };
+
+          setUserProfile(updatedProfile);
+          // Cập nhật lại localStorage để bảo toàn dữ liệu chính xác
+          localStorage.setItem(`rakuslide:user-profile:${user.id}`, JSON.stringify(updatedProfile));
+        } else {
+          // Fallback dùng metadata session nếu chưa có dữ liệu trong DB và localStorage
+          const userMetadata = user.user_metadata ?? {};
+          try {
+            const localData = localStorage.getItem(`rakuslide:user-profile:${user.id}`);
+            if (!localData) {
+              const fallbackData = {
+                id: user.id,
+                email: user.email,
+                display_name: userMetadata.full_name || userMetadata.name || user.email,
+                avatar_url: userMetadata.avatar_url || userMetadata.picture || null,
+              };
+              setUserProfile(fallbackData);
+              localStorage.setItem(`rakuslide:user-profile:${user.id}`, JSON.stringify(fallbackData));
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user profile:', err);
+      }
+    }
+
+    fetchProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   function handleLoginSuccess(demoUser) {
     const templateId = getEditorTemplateIdFromHash();
@@ -368,6 +460,7 @@ export default function App() {
         isAuthReady={isAuthReady}
         isLoggedIn={isLoggedIn}
         user={user}
+        userProfile={userProfile}
         onLogout={handleLogout}
         onOpenProfile={() => handleViewChange('profile')}
         searchQuery={searchQuery}
@@ -402,6 +495,7 @@ export default function App() {
         {view === 'profile' && (
           <Profile
             user={user}
+            userProfile={userProfile}
             onCancel={() => handleViewChange('home')}
             onUserUpdated={setUser}
           />
@@ -413,6 +507,7 @@ export default function App() {
             initialTemplate={detailTemplate}
             currentUserId={user?.id}
             currentUserEmail={user?.email ?? ''}
+            userProfile={userProfile}
             onBack={handleBackFromTemplateDetail}
             onCreatedDeck={handleCreatedDeckFromDetail}
             onEditTemplate={handleOpenSavedTemplate}

@@ -13,6 +13,7 @@ export default function Header({
   isAuthReady,
   isLoggedIn,
   user,
+  userProfile,
   onLogout,
   onOpenProfile,
   searchQuery,
@@ -25,7 +26,7 @@ export default function Header({
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef(null);
   const userMetadata = user?.user_metadata ?? {};
-  const avatarUrl = userMetadata.avatar_url || userMetadata.picture;
+  const avatarUrl = userProfile?.avatar_url || userMetadata.avatar_url || userMetadata.picture;
 
   useEffect(() => {
     function handleClickOutside(event) {
