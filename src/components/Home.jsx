@@ -8,6 +8,12 @@ import { filterTemplates, sortTemplates } from '../utils/templateSearch';
 import SlidePreviewThumbnail from './SlidePreviewThumbnail.jsx';
 import './Home.css';
 
+function getDynamicDateString(offsetDays) {
+  const date = new Date();
+  date.setDate(date.getDate() - offsetDays);
+  return date.toISOString().split('T')[0].replace(/-/g, '/'); // YYYY/MM/DD
+}
+
 const popularSlides = [
   {
     id: 'popular-1',
@@ -219,6 +225,12 @@ const popularSlides = [
   },
 ];
 
+// Tự động ghi đè ngày cập nhật động sinh động cho popularSlides
+popularSlides.forEach((slide, index) => {
+  slide.date = getDynamicDateString(index % 8);
+});
+
+
 const searchTemplates = [
   {
     id: 1,
@@ -318,6 +330,11 @@ const searchTemplates = [
   },
 ];
 
+// Tự động ghi đè ngày cập nhật động sinh động cho searchTemplates
+searchTemplates.forEach((slide, index) => {
+  slide.date = getDynamicDateString(index % 8);
+});
+
 void searchTemplates;
 
 const recommendedTemplates = [
@@ -343,7 +360,7 @@ const recommendedTemplates = [
         }
       }]
     },
-    date: '2023/10/10',
+    date: getDynamicDateString(0),
     views: '12万..',
     slides: 10,
   },
@@ -369,7 +386,7 @@ const recommendedTemplates = [
         }
       }]
     },
-    date: '2023/11/05',
+    date: getDynamicDateString(1),
     views: '9.4万..',
     slides: 16,
   },
@@ -395,7 +412,7 @@ const recommendedTemplates = [
         }
       }]
     },
-    date: '2023/10/18',
+    date: getDynamicDateString(2),
     views: '7.1万..',
     slides: 12,
   },
@@ -421,11 +438,20 @@ const recommendedTemplates = [
         }
       }]
     },
-    date: '2023/10/22',
+    date: getDynamicDateString(3),
     views: '5.6万..',
     slides: 14,
   },
 ];
+
+// Tự động ghi đè ID tĩnh sang UUID hợp lệ để hỗ trợ lưu đánh giá thật vào database
+popularSlides.forEach((slide, index) => {
+  slide.id = `00000000-0000-0000-0000-00000000000${index + 5}`;
+});
+
+recommendedTemplates.forEach((slide, index) => {
+  slide.id = `00000000-0000-0000-0000-00000000000${index + 1}`;
+});
 
 const sortOptionIds = ['name', 'created', 'rating', 'views'];
 

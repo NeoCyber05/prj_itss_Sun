@@ -7,6 +7,7 @@ import {
   getDeckForEditor,
   updateTemplateRating,
 } from '../services/slideCreationService.js';
+import { supabase } from '../supabaseClient.js';
 import './TemplateDetail.css';
 
 const COPY = {
@@ -43,6 +44,7 @@ const COPY = {
     ratingSubmit: '評価を送信',
     ratingCancel: 'キャンセル',
     ratingSubmitted: '評価を送信しました',
+    ratingLoginRequired: 'テンプレートを評価するにはログインが必要です。',
   },
   vi: {
     pageTitle: 'CHI TIẾT MẪU SLIDE',
@@ -77,6 +79,7 @@ const COPY = {
     ratingSubmit: 'Gửi đánh giá',
     ratingCancel: 'Hủy',
     ratingSubmitted: 'Đã gửi đánh giá',
+    ratingLoginRequired: 'Bạn cần đăng nhập để đánh giá mẫu slide.',
   },
 };
 
@@ -124,16 +127,20 @@ function clamp(value, min, max) {
 }
 
 function isPersistedUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     .test(String(value ?? ''));
 }
 
 function formatDate(value, language) {
-  if (!value) return '18/10/2023';
+  const date = value ? new Date(value) : new Date();
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return '18/10/2023';
+  if (Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'ja-JP', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date());
+  }
 
   return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'ja-JP', {
     day: '2-digit',
@@ -291,18 +298,23 @@ function normalizeDetailSlide(slide, index, fallbackTitle) {
   };
 }
 
-function buildDetailFromDeck(deck, copy, language) {
+function buildDetailFromDeck(deck, copy, language, currentUserId, currentUserEmail) {
   const template = deck?.template;
   const title = template?.title?.trim() || copy.defaultCategory;
   const slides = (deck?.slides?.length ? deck.slides : [])
     .map((slide, index) => normalizeDetailSlide(slide, index, title));
+
+  const ownerId = template?.owner_id;
+  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId && currentUserEmail)
+    ? currentUserEmail.split('@')[0]
+    : copy.defaultAuthor;
 
   return {
     id: template?.id ?? '',
     title,
     description: template?.description || copy.defaultDescription,
     category: template?.subject || template?.category || copy.defaultCategory,
-    author: template?.author || copy.defaultAuthor,
+    author: template?.author || fallbackAuthor,
     date: formatDate(template?.updated_at ?? template?.created_at, language),
     image: template?.thumbnail_url ?? slides[0]?.thumbnail_url ?? null,
     language: language === 'vi' ? 'Tiếng Việt' : '日本語',
@@ -310,28 +322,80 @@ function buildDetailFromDeck(deck, copy, language) {
     rating: Number(template?.rating_average ?? template?.rating ?? 0),
     slides: slides.length ? slides : buildCatalogSlides({ ...template, title, slides: 5 }, copy),
     isPersisted: Boolean(template?.id),
+    owner_id: ownerId,
   };
 }
 
-function buildDetailFromTemplate(template, copy, language) {
+function buildDetailFromTemplate(template, copy, language, currentUserId, currentUserEmail) {
   const title = template?.title?.trim() || copy.defaultCategory;
   const slides = template?.detailSlides?.length
     ? template.detailSlides.map((slide, index) => normalizeDetailSlide(slide, index, title))
     : buildCatalogSlides(template ?? { title }, copy);
+
+  const isPersisted = isPersistedUuid(template?.id);
+  const ownerId = template?.owner_id ?? template?.template?.owner_id;
+
+  const fallbackAuthor = (ownerId && currentUserId && ownerId === currentUserId && currentUserEmail)
+    ? currentUserEmail.split('@')[0]
+    : copy.defaultAuthor;
+
+  // Sinh tên tác giả chân thực và sinh động cho các slide tĩnh
+  let author = template?.author;
+  if (!author) {
+    if (template?.id === 'popular-1') author = language === 'vi' ? 'Ban Giám Đốc RakuSlide' : 'RakuSlide役員会';
+    else if (template?.id === 'popular-2') author = language === 'vi' ? 'Phòng Marketing RakuSlide' : 'RakuSlideマーケティング部';
+    else if (template?.id === 'popular-3') author = language === 'vi' ? 'Phòng Phát Triển Sản Phẩm' : '製品開発部';
+    else if (template?.id === 'popular-4') author = language === 'vi' ? 'Bộ Phận Đào Tạo Nhân Sự' : '人事研修担当';
+    else if (template?.id === 'popular-5') author = language === 'vi' ? 'Phòng Tài Chính Kế Toán' : '財務経理課';
+    else if (template?.id === 'popular-6') author = language === 'vi' ? 'Ban Quản Lý Dự Án' : 'プロジェクト管理事務局';
+    else if (template?.id === 'popular-7') author = language === 'vi' ? 'Bộ Phận Chăm Sóc Khách Hàng' : 'カスタマーサポート担当';
+    else if (template?.id === 'popular-8') author = language === 'vi' ? 'Hội Đồng Chiến Lược' : '経営戦略会議';
+    else if (template?.id === 'recommended-1') author = language === 'vi' ? 'Founder & CEO RakuSlide' : 'RakuSlide創業者兼CEO';
+    else if (template?.id === 'recommended-2') author = language === 'vi' ? 'Bộ Phận Phân Tích Kế Hoạch' : '計画分析部';
+    else if (template?.id === 'recommended-3') author = language === 'vi' ? 'Ban Quản Lý Sản Phẩm' : 'プロダクトマネジメントチーム';
+    else if (template?.id === 'recommended-4') author = language === 'vi' ? 'Phòng Nhân Sự' : 'RakuSlide人事部';
+    else author = fallbackAuthor;
+  }
+
+  // Tự động tính ngày cập nhật động sinh động dựa theo ngày hiện tại cho slide tĩnh
+  let dateStr = template?.date;
+  if (!isPersisted && dateStr) {
+    const today = new Date();
+    let offsetDays = 0;
+    if (template?.id === 'popular-1' || template?.id === 'recommended-1') offsetDays = 0; // Hôm nay
+    else if (template?.id === 'popular-2' || template?.id === 'recommended-2') offsetDays = 1; // Hôm qua
+    else if (template?.id === 'popular-3' || template?.id === 'recommended-3') offsetDays = 2; // 2 ngày trước
+    else if (template?.id === 'popular-4' || template?.id === 'recommended-4') offsetDays = 3; // 3 ngày trước
+    else if (template?.id === 'popular-5') offsetDays = 4;
+    else if (template?.id === 'popular-6') offsetDays = 5;
+    else if (template?.id === 'popular-7') offsetDays = 6;
+    else if (template?.id === 'popular-8') offsetDays = 7;
+    else offsetDays = 10;
+
+    today.setDate(today.getDate() - offsetDays);
+    dateStr = new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'ja-JP', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(today);
+  } else if (!dateStr) {
+    dateStr = formatDate(template?.updated_at ?? template?.created_at, language);
+  }
 
   return {
     id: template?.id ?? '',
     title,
     description: template?.description || copy.defaultDescription,
     category: template?.category || template?.topic || copy.defaultCategory,
-    author: template?.author || copy.defaultAuthor,
-    date: template?.date || formatDate(template?.updated_at ?? template?.created_at, language),
+    author,
+    date: dateStr,
     image: template?.image ?? template?.thumbnail_url ?? slides[0]?.thumbnail_url ?? null,
     language: template?.language || (language === 'vi' ? 'Tiếng Việt' : '日本語'),
     slide_count: template?.slide_count ?? template?.slides ?? slides.length,
     rating: Number(template?.rating_average ?? template?.rating ?? 0),
     slides,
-    isPersisted: Boolean(isPersistedUuid(template?.id)),
+    isPersisted,
+    owner_id: ownerId,
   };
 }
 
@@ -621,12 +685,67 @@ export default function TemplateDetail({
   const [ratingValue, setRatingValue] = useState(0);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [localRating, setLocalRating] = useState(null);
+  const [dbTemplate, setDbTemplate] = useState(null);
   const shouldLoadSavedDeck = Boolean(isPersistedUuid(templateId) && currentUserId);
 
+  // Tự động fetch thông tin rating và cập nhật của template từ database
+  useEffect(() => {
+    let isMounted = true;
+    if (isPersistedUuid(templateId)) {
+      supabase
+        .from('templates')
+        .select('*')
+        .eq('id', templateId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data && isMounted) {
+            setDbTemplate(data);
+          }
+        });
+    } else {
+      setDbTemplate(null);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [templateId]);
+
   const detail = useMemo(() => {
-    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language);
-    return buildDetailFromTemplate(initialTemplate, copy, language);
-  }, [copy, initialTemplate, language, loadedDeck]);
+    if (loadedDeck) return buildDetailFromDeck(loadedDeck, copy, language, currentUserId, currentUserEmail);
+    
+    // Merge dữ liệu động từ dbTemplate (rating, owner_id, date...) vào initialTemplate tĩnh
+    const baseTemplate = dbTemplate 
+      ? { ...initialTemplate, ...dbTemplate } 
+      : initialTemplate;
+
+    return buildDetailFromTemplate(baseTemplate, copy, language, currentUserId, currentUserEmail);
+  }, [copy, initialTemplate, language, loadedDeck, dbTemplate, currentUserId, currentUserEmail]);
+
+  const [authorName, setAuthorName] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const ownerId = detail.owner_id;
+
+    if (ownerId && isPersistedUuid(ownerId)) {
+      supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', ownerId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data?.display_name && isMounted) {
+            setAuthorName(data.display_name);
+          }
+        });
+    } else {
+      setAuthorName('');
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [detail.owner_id]);
   const slideCount = detail.slides.length;
   const goToSlide = useCallback((index) => {
     setActiveSlideIndex(clamp(index, 0, slideCount - 1));
@@ -793,6 +912,14 @@ export default function TemplateDetail({
   async function handleSubmitRating() {
     if (ratingValue === 0) return;
 
+    if (!currentUserId) {
+      setToast(copy.ratingLoginRequired || 'Bạn cần đăng nhập để đánh giá mẫu slide.');
+      setIsRatingOpen(false);
+      setRatingValue(0);
+      onRequireLogin?.();
+      return;
+    }
+
     setIsSubmittingRating(true);
 
     try {
@@ -800,7 +927,10 @@ export default function TemplateDetail({
       let newRating = ratingValue;
 
       if (isPersisted) {
-        const updatedTemplate = await updateTemplateRating(detail.id, ratingValue);
+        const updatedTemplate = await updateTemplateRating(detail.id, ratingValue, currentUserId);
+        if (updatedTemplate) {
+          setDbTemplate(updatedTemplate);
+        }
         newRating = Number(updatedTemplate?.rating_average ?? ratingValue);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -892,18 +1022,20 @@ export default function TemplateDetail({
             ))}
           </div>
 
-          <div className="template-detail__primary-actions">
-            <button type="button" className="template-detail__use" onClick={handleUseTemplate} disabled={isUsing || isSaving}>
-              <span>{isUsing ? copy.using : copy.useTemplate}</span>
-              <DetailIcon name="plus" />
-            </button>
-            <button type="button" className="template-detail__preview-btn" onClick={() => {
-              setIsRatingOpen(true);
-              setRatingValue(0);
-            }}>
-              {copy.preview}
-            </button>
-          </div>
+          {currentUserId && (
+            <div className="template-detail__primary-actions">
+              <button type="button" className="template-detail__use" onClick={handleUseTemplate} disabled={isUsing || isSaving}>
+                <span>{isUsing ? copy.using : copy.useTemplate}</span>
+                <DetailIcon name="plus" />
+              </button>
+              <button type="button" className="template-detail__preview-btn" onClick={() => {
+                setIsRatingOpen(true);
+                setRatingValue(0);
+              }}>
+                {copy.preview}
+              </button>
+            </div>
+          )}
         </div>
 
         <aside className="template-detail__info">
@@ -916,19 +1048,21 @@ export default function TemplateDetail({
             <li>{formatCopy(copy.slideCount, { count: detail.slide_count })}</li>
             <li>{formatCopy(copy.language, { language: detail.language })}</li>
             <li>{formatCopy(copy.category, { category: detail.category })}</li>
-            <li>{formatCopy(copy.author, { author: detail.author })}</li>
+            <li>{formatCopy(copy.author, { author: authorName || detail.author })}</li>
             <li>{formatCopy(copy.updated, { date: detail.date })}</li>
           </ul>
 
-          <div className="template-detail__secondary-actions">
+          <div className={`template-detail__secondary-actions${!currentUserId ? ' template-detail__secondary-actions--single' : ''}`}>
             <button type="button" onClick={handleDownload}>
               <DetailIcon name="download" />
               {copy.download}
             </button>
-            <button type="button" onClick={handleSaveTemplate} disabled={isSaving || isUsing}>
-              <DetailIcon name="folder" />
-              {isSaving ? copy.saving : copy.save}
-            </button>
+            {currentUserId && (
+              <button type="button" onClick={handleSaveTemplate} disabled={isSaving || isUsing}>
+                <DetailIcon name="folder" />
+                {isSaving ? copy.saving : copy.save}
+              </button>
+            )}
           </div>
 
           <section className="template-detail__related" aria-labelledby="relatedTemplatesTitle">

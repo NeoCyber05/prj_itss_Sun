@@ -342,6 +342,10 @@
   gap: 10px;
 }
 
+.template-detail__secondary-actions--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .template-detail__secondary-actions button {
   min-height: 54px;
   font-size: 0.95rem;

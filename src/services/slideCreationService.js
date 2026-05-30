@@ -237,7 +237,7 @@ function getRecentTemplateTimeValue(template) {
 }
 
 function isPersistedUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     .test(String(value ?? ''));
 }
 
@@ -1368,7 +1368,7 @@ export async function saveDeckForEditor({
   }
 }
 
-export async function updateTemplateRating(templateId, ratingValue) {
+export async function updateTemplateRating(templateId, ratingValue, userId) {
   requireValue(templateId, 'A template id is required to submit a rating.');
   requireValue(ratingValue, 'A rating value is required.');
 
@@ -1378,6 +1378,37 @@ export async function updateTemplateRating(templateId, ratingValue) {
     throw new Error('Rating must be a number between 1 and 5.');
   }
 
+  // Nếu có userId, thử upsert vào bảng template_ratings trước
+  if (userId) {
+    const { error: upsertError } = await supabase
+      .from('template_ratings')
+      .upsert(
+        {
+          template_id: templateId,
+          user_id: userId,
+          rating: normalizedRating,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'template_id,user_id' }
+      );
+
+    if (!upsertError) {
+      // Upsert thành công, fetch lại templates để lấy kết quả rating_average/rating_count mới do trigger tự động cập nhật
+      const { data: updatedTemplate, error: fetchTemplateError } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('id', templateId)
+        .maybeSingle();
+
+      if (!fetchTemplateError && updatedTemplate) {
+        return normalizeTemplate(updatedTemplate);
+      }
+    } else {
+      console.warn('Failed to upsert to template_ratings, falling back to direct update:', upsertError.message);
+    }
+  }
+
+  // Fallback hoặc nếu không có userId: Cập nhật trực tiếp vào bảng templates như cũ
   const { data: currentTemplate, error: fetchError } = await supabase
     .from('templates')
     .select('rating_average,rating_count')
@@ -1415,5 +1446,5 @@ export async function updateTemplateRating(templateId, ratingValue) {
     throw error;
   }
 
-  return data;
+  return normalizeTemplate(data);
 }
