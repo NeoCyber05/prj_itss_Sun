@@ -4,7 +4,11 @@ import {
   listRecentlyOpenedTemplates,
   listSearchableTemplates,
 } from '../services/slideCreationService.js';
-import { filterTemplates, sortTemplates } from '../utils/templateSearch';
+import {
+  filterTemplates,
+  getDefaultSortDirection,
+  sortTemplates,
+} from '../utils/templateSearch';
 import SlidePreviewThumbnail from './SlidePreviewThumbnail.jsx';
 import './Home.css';
 
@@ -455,6 +459,18 @@ recommendedTemplates.forEach((slide, index) => {
 
 const sortOptionIds = ['name', 'created', 'rating', 'views'];
 
+function getSortLabel(label, isActive, direction) {
+  if (!label.includes('↑↓')) {
+    return label;
+  }
+
+  if (!isActive) {
+    return label;
+  }
+
+  return label.replace('↑↓', direction === 'asc' ? '↑' : '↓');
+}
+
 function formatDate(value, language) {
   if (!value) return language === 'vi' ? '18/10/2023' : '2023/10/18';
 
@@ -568,7 +584,10 @@ export default function Home({
   refreshKey = 0,
 }) {
   const { language, t } = useLanguage();
-  const [activeSort, setActiveSort] = useState('name');
+  const [activeSort, setActiveSort] = useState({
+    id: 'name',
+    direction: getDefaultSortDirection('name'),
+  });
   const [recentTemplates, setRecentTemplates] = useState([]);
   const [recentError, setRecentError] = useState('');
   const [isRecentLoading, setIsRecentLoading] = useState(false);
@@ -704,6 +723,22 @@ export default function Home({
     [t],
   );
 
+  function handleSortClick(sortId) {
+    setActiveSort((currentSort) => {
+      if (currentSort.id === sortId) {
+        return {
+          id: sortId,
+          direction: currentSort.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+
+      return {
+        id: sortId,
+        direction: getDefaultSortDirection(sortId),
+      };
+    });
+  }
+
   return (
     <div className="home-container">
       {showGuestLanding ? (
@@ -769,6 +804,7 @@ export default function Home({
                   key={template.id}
                   template={template}
                   title={template.title}
+                  firstSlide={template.first_slide}
                   image={template.image}
                   date={template.date}
                   slides={template.slides}
@@ -797,10 +833,11 @@ export default function Home({
                 <button
                   key={option.id}
                   type="button"
-                  className={`sort-btn${activeSort === option.id ? ' active' : ''}`}
-                  onClick={() => setActiveSort(option.id)}
+                  className={`sort-btn${activeSort.id === option.id ? ' active' : ''}`}
+                  onClick={() => handleSortClick(option.id)}
+                  aria-pressed={activeSort.id === option.id}
                 >
-                  {option.label}
+                  {getSortLabel(option.label, activeSort.id === option.id, activeSort.direction)}
                 </button>
               ))}
             </div>
@@ -818,7 +855,7 @@ export default function Home({
       )}
 
       {!showLoggedInDashboard && (!showSearchResults || (!isLibraryLoading && !libraryError)) && (
-        <div className="home-grid">
+        <div className="home-grid" key={`${activeSort.id}-${activeSort.direction}`}>
           {templates.map((template) => (
             <SlideCard
               key={template.id}

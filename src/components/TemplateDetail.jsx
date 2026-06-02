@@ -721,12 +721,20 @@ export default function TemplateDetail({
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [localRating, setLocalRating] = useState(null);
   const [dbTemplate, setDbTemplate] = useState(null);
-  const shouldLoadSavedDeck = Boolean(isPersistedUuid(templateId) && currentUserId);
+  const shouldLoadSavedDeck = Boolean(
+    isPersistedUuid(templateId) &&
+    currentUserId &&
+    !String(templateId).startsWith('00000000-0000-0000-0000-00000000000'),
+  );
 
   // Tự động fetch thông tin rating và cập nhật của template từ database
   useEffect(() => {
     let isMounted = true;
-    if (isPersistedUuid(templateId)) {
+
+    if (
+      isPersistedUuid(templateId) &&
+      !String(templateId).startsWith('00000000-0000-0000-0000-00000000000')
+    ) {
       supabase
         .from('templates')
         .select('*')
@@ -737,9 +745,8 @@ export default function TemplateDetail({
             setDbTemplate(data);
           }
         });
-    } else {
-      setDbTemplate(null);
     }
+
     return () => {
       isMounted = false;
     };

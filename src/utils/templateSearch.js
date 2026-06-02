@@ -30,23 +30,91 @@ export function filterTemplates(templates, query) {
 }
 
 function parseDate(value) {
-  return new Date(String(value ?? '').replace(/\//g, '-')).getTime() || 0;
+  const num = Number(value);
+  if (Number.isFinite(num) && num > 0) {
+    return num;
+  }
+
+  const time = new Date(String(value ?? '').replace(/\//g, '-')).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
-export function sortTemplates(templates, sortId, locale = 'ja') {
-  const items = [...templates];
-
+export function getDefaultSortDirection(sortId) {
   switch (sortId) {
+    case 'name':
+      return 'asc';
     case 'created':
-      return items.sort(
-        (left, right) => parseDate(right.sortDate ?? right.date) - parseDate(left.sortDate ?? left.date),
-      );
     case 'rating':
-      return items.sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0));
     case 'views':
-      return items.sort((left, right) => (right.viewCount ?? 0) - (left.viewCount ?? 0));
+    default:
+      return 'desc';
+  }
+}
+
+function normalizeSortConfig(sortConfig) {
+  if (typeof sortConfig === 'string') {
+    return {
+      id: sortConfig,
+      direction: getDefaultSortDirection(sortConfig),
+    };
+  }
+
+  const id = sortConfig?.id ?? 'name';
+  const direction = sortConfig?.direction === 'asc' ? 'asc' : 'desc';
+
+  return { id, direction };
+}
+
+function compareNumbers(left, right, direction) {
+  const delta = (left ?? 0) - (right ?? 0);
+  return direction === 'asc' ? delta : -delta;
+}
+
+function compareStrings(left, right, locale, direction) {
+  const result = String(left ?? '').localeCompare(String(right ?? ''), locale);
+  return direction === 'asc' ? result : -result;
+}
+
+export function sortTemplates(templates, sortConfig, locale = 'ja') {
+  const items = templates.map((item) => ({ ...item }));
+  const { id, direction } = normalizeSortConfig(sortConfig);
+  const compareTitle = (left, right, nextDirection = 'asc') =>
+    compareStrings(left.title, right.title, locale, nextDirection);
+
+  switch (id) {
+    case 'created':
+      items.sort((left, right) =>
+        compareNumbers(
+          parseDate(left.sortDate ?? left.date),
+          parseDate(right.sortDate ?? right.date),
+          direction,
+        ) || compareTitle(left, right),
+      );
+      break;
+    case 'rating':
+      items.sort((left, right) =>
+        compareNumbers(left.rating ?? 0, right.rating ?? 0, direction)
+        || compareTitle(left, right),
+      );
+      break;
+    case 'views':
+      items.sort((left, right) =>
+        compareNumbers(left.viewCount ?? 0, right.viewCount ?? 0, direction)
+        || compareTitle(left, right),
+      );
+      break;
     case 'name':
     default:
-      return items.sort((left, right) => left.title.localeCompare(right.title, locale));
+      items.sort((left, right) =>
+        compareTitle(left, right, direction)
+        || compareNumbers(
+          parseDate(left.sortDate ?? left.date),
+          parseDate(right.sortDate ?? right.date),
+          'desc',
+        ),
+      );
+      break;
   }
+
+  return items;
 }
